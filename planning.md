@@ -15,6 +15,22 @@ Build the Android application defined in `README.md` iteratively. The system rel
   * `Hypothesis Engine` (Idea input to Asset suggestions)
 * **Step 3:** Build static UI components using mock data (e.g., hardcoded news strings, fake stock tickers).
 
+### Phase 1.5: Foldable UI Architecture (Adaptive Layout)
+**Goal:** Ensure the app natively supports foldable devices (specifically targeting the Galaxy Z Fold 6 aspect ratios) using Material 3 Adaptive layouts.
+
+* **Step 1: Dependencies:** Add the required adaptive layout libraries to the `app/build.gradle.kts` file:
+  * `androidx.compose.material3.adaptive:adaptive`
+  * `androidx.compose.material3.adaptive:adaptive-layout`
+  * `androidx.compose.material3.adaptive:adaptive-navigation`
+
+* **Step 2: Window Size Classes:** Implement `calculateWindowSizeClass()` at the root of the app to continuously monitor the screen state.
+  * **Compact Width:** Assume the device is folded (Cover Screen).
+  * **Expanded Width:** Assume the device is unfolded (Main Screen).
+
+* **Step 3: ListDetailPaneScaffold Implementation:** Use the `ListDetailPaneScaffold` component for the primary data screens (like the Portfolio and News Search).
+  * **Behavior when Compact:** Show only the List pane. When a user taps a stock or news item, navigate forward to show the Detail pane full-screen.
+  * **Behavior when Expanded:** Automatically split the screen. Show the List pane on the left (33% width) and the Detail pane (Charts/Article text) on the right (67% width) simultaneously.
+  
 ## Phase 2: Data Aggregation & Backend Setup
 **Goal:** Establish the pipelines to pull raw financial and news data. (This can be done via a lightweight Python backend or direct API calls from the Android app, depending on architecture choice).
 * **Step 1:** Implement News API integration (e.g., Google News RSS, NewsAPI) based on keyword search.

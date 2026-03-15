@@ -45,25 +45,29 @@ fun AdaptiveLayout() {
         directive = navigator.scaffoldDirective,
         value = navigator.scaffoldValue,
         listPane = {
-            AnimatedPane(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+            AnimatedPane(modifier = Modifier.fillMaxWidth()) {
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
                     items(items) { item ->
                         ListItem(
                             headlineContent = { Text(item) },
-                            modifier = Modifier.clickable {
-                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, item)
-                            }
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, item)
+                                }
                         )
                     }
                 }
             }
         },
         detailPane = {
-            AnimatedPane(modifier = Modifier.fillMaxSize()) {
+            AnimatedPane(modifier = Modifier.fillMaxWidth()) {
                 val currentItem = navigator.currentDestination?.content
                 if (currentItem != null) {
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -72,7 +76,7 @@ fun AdaptiveLayout() {
                         Text("Selected: $currentItem", style = MaterialTheme.typography.bodyLarge)
                     }
                 } else {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text("Select an item from the list")
                     }
                 }

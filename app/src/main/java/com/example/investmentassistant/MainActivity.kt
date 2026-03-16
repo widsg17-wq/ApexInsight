@@ -19,6 +19,7 @@ import androidx.window.core.layout.WindowWidthSizeClass
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.investmentassistant.ui.NewsSearchScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,7 +75,9 @@ fun AdaptiveLayout() {
         detailPane = {
             AnimatedPane(modifier = Modifier.fillMaxSize()) {
                 val currentItem = navigator.currentDestination?.content
-                if (currentItem != null) {
+                if (currentItem == "News Search") {
+                    NewsSearchScreen(modifier = Modifier.fillMaxSize())
+                } else if (currentItem != null) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()

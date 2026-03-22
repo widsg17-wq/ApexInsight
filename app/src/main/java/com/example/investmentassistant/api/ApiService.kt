@@ -2,7 +2,10 @@ package com.example.investmentassistant.api
 
 import com.example.investmentassistant.model.NewsArticle
 import kotlinx.coroutines.delay
-
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.GET
+import retrofit2.http.Query
 interface ApiService {
     suspend fun searchNews(query: String): List<NewsArticle>
 }
@@ -37,5 +40,51 @@ class MockApiService : ApiService {
                 url = "https://example.com/news/3"
             )
         )
+    }
+}
+
+data class NewsApiResponse(val articles: List<ApiArticle>)
+data class ApiArticle(
+    val title: String?,
+    val source: ApiSource?,
+    val publishedAt: String?,
+    val urlToImage: String?,
+    val url: String?
+)
+data class ApiSource(val name: String?)
+
+interface NewsApiNetwork {
+    @GET("everything")
+    suspend fun getNews(
+        @Query("q") query: String,
+        @Query("sortBy") sortBy: String = "publishedAt",
+        @Query("apiKey") apiKey: String = "27aaddd3f2c44918a6e2bc31beb350d7" // Your API Key!
+    ): NewsApiResponse
+}
+
+class RealApiService : ApiService {
+    private val retrofit = Retrofit.Builder()
+        .baseUrl("https://newsapi.org/v2/")
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    private val network = retrofit.create(NewsApiNetwork::class.java)
+
+    override suspend fun searchNews(query: String): List<NewsArticle> {
+        return try {
+            val response = network.getNews(query)
+            response.articles.map { apiArticle ->
+                NewsArticle(
+                    title = apiArticle.title ?: "No Title",
+                    source = apiArticle.source?.name ?: "Unknown",
+                    publishedAt = apiArticle.publishedAt ?: "",
+                    urlToImage = apiArticle.urlToImage,
+                    url = apiArticle.url ?: ""
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
     }
 }

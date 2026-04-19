@@ -10,6 +10,7 @@ if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
 val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
+val fredApiKey = localProperties.getProperty("FRED_API_KEY") ?: ""
 
 android {
     namespace = "com.example.investmentassistant"
@@ -27,6 +28,7 @@ android {
             useSupportLibrary = true
         }
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("String", "FRED_API_KEY", "\"$fredApiKey\"")
     }
 
     buildTypes {
@@ -92,4 +94,5 @@ dependencies {
     implementation(libs.generativeai)
     implementation(libs.compose.richtext.commonmark)
     implementation(libs.compose.richtext.ui.material3)
+    implementation("androidx.navigation:navigation-compose:2.7.7")
 }

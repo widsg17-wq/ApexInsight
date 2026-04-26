@@ -86,7 +86,6 @@ class RealApiService : ApiService {
 data class FredResponse(val observations: List<FredObservation>)
 data class FredObservation(val date: String, val value: String)
 
-// ★ 새로 추가: 뷰모델로 보낼 '최신값'과 '과거 추세 리스트'를 묶은 상자
 data class MacroData(val latestValue: String, val history: List<Float>)
 
 interface FredApiNetwork {
@@ -96,13 +95,13 @@ interface FredApiNetwork {
         @Query("api_key") apiKey: String,
         @Query("file_type") fileType: String = "json",
         @Query("sort_order") sortOrder: String = "desc",
-        @Query("limit") limit: Int = 30 // ★ 1개에서 30개로 늘렸습니다! (그래프를 그리기 위해)
+        @Query("limit") limit: Int = 30
     ): FredResponse
 }
 
 interface FredApiService {
-    // 반환값을 String에서 MacroData 상자로 바꿨습니다.
-    suspend fun getMacroData(seriesId: String): MacroData
+    // ★ 수정: limit 파라미터 추가
+    suspend fun getMacroData(seriesId: String, limit: Int = 30): MacroData
 }
 
 class RealFredApiService : FredApiService {
@@ -113,15 +112,13 @@ class RealFredApiService : FredApiService {
         .build()
     private val network = retrofit.create(FredApiNetwork::class.java)
 
-    override suspend fun getMacroData(seriesId: String): MacroData {
+    // ★ 수정: 파라미터로 받은 limit을 network 호출 시 넘겨줍니다
+    override suspend fun getMacroData(seriesId: String, limit: Int): MacroData {
         return try {
-            val response = network.getObservations(seriesId = seriesId, apiKey = apiKey)
+            val response = network.getObservations(seriesId = seriesId, apiKey = apiKey, limit = limit)
             val obs = response.observations
 
-            // 1. 최신값 (가장 첫 번째 데이터)
             val latest = obs.firstOrNull()?.value ?: "-"
-
-            // 2. 과거 30일치 데이터 (소수점으로 변환 후, 그래프 그리기 좋게 과거->현재 순으로 뒤집음)
             val history = obs.mapNotNull { it.value.toFloatOrNull() }.reversed()
 
             MacroData(latest, history)
@@ -132,6 +129,9 @@ class RealFredApiService : FredApiService {
     }
 }
 
+// ==========================================
+// 3. 야후 파이낸스 API
+// ==========================================
 data class YahooResponse(val chart: YahooChart?)
 data class YahooChart(val result: List<YahooResult>?)
 data class YahooResult(val meta: YahooMeta?, val indicators: YahooIndicators?)
@@ -140,7 +140,6 @@ data class YahooIndicators(val quote: List<YahooQuote>?)
 data class YahooQuote(val close: List<Float?>?)
 
 interface YahooApiNetwork {
-    // interval=1d (하루 단위), range=1mo (최근 1달치) 데이터 요청
     @GET("chart/{symbol}")
     suspend fun getChart(
         @retrofit2.http.Path("symbol") symbol: String,
@@ -150,7 +149,8 @@ interface YahooApiNetwork {
 }
 
 interface FinanceApiService {
-    suspend fun getIndexData(symbol: String): MacroData
+    // ★ 수정: interval과 range 파라미터 추가
+    suspend fun getIndexData(symbol: String, interval: String = "1d", range: String = "1mo"): MacroData
 }
 
 class RealFinanceApiService : FinanceApiService {
@@ -161,18 +161,15 @@ class RealFinanceApiService : FinanceApiService {
 
     private val network = retrofit.create(YahooApiNetwork::class.java)
 
-    override suspend fun getIndexData(symbol: String): MacroData {
+    // ★ 수정: 파라미터로 받은 interval과 range를 network 호출 시 넘겨줍니다
+    override suspend fun getIndexData(symbol: String, interval: String, range: String): MacroData {
         return try {
-            val response = network.getChart(symbol)
+            val response = network.getChart(symbol, interval = interval, range = range)
             val result = response.chart?.result?.firstOrNull()
 
-            // 1. 최신 현재가 가져오기
             val currentPrice = result?.meta?.regularMarketPrice ?: 0f
-
-            // 2. 과거 한 달 치 종가 리스트 가져오기 (null 값은 제외)
             val history = result?.indicators?.quote?.firstOrNull()?.close?.filterNotNull() ?: emptyList()
 
-            // 3. 천 단위 콤마(,) 찍어서 예쁘게 포맷팅
             val formattedPrice = if (currentPrice > 0) String.format("%,.2f", currentPrice) else "Error"
 
             MacroData(formattedPrice, history)
@@ -183,6 +180,9 @@ class RealFinanceApiService : FinanceApiService {
     }
 }
 
+// ==========================================
+// 4. Fear & Greed API
+// ==========================================
 data class FngResponse(val data: List<FngData>?)
 data class FngData(val value: String?, val value_classification: String?)
 
@@ -192,7 +192,8 @@ interface FngApiNetwork {
 }
 
 interface FngApiService {
-    suspend fun getFearGreedData(): MacroData
+    // ★ 수정: limit 파라미터 추가
+    suspend fun getFearGreedData(limit: Int = 30): MacroData
 }
 
 class RealFngApiService : FngApiService {
@@ -203,17 +204,15 @@ class RealFngApiService : FngApiService {
 
     private val network = retrofit.create(FngApiNetwork::class.java)
 
-    override suspend fun getFearGreedData(): MacroData {
+    // ★ 수정: 파라미터로 받은 limit을 network 호출 시 넘겨줍니다
+    override suspend fun getFearGreedData(limit: Int): MacroData {
         return try {
-            val response = network.getFearAndGreed(limit = 30)
+            val response = network.getFearAndGreed(limit = limit)
             val dataList = response.data ?: emptyList()
 
-            // 1. 최신 수치
             val latest = dataList.firstOrNull()?.value ?: "50"
-            // (선택) "Greed", "Fear" 같은 텍스트 데이터 (필요시 사용)
             val classification = dataList.firstOrNull()?.value_classification ?: "Neutral"
 
-            // 2. 과거 30일치 추세 (과거->현재 순으로 정렬)
             val history = dataList.mapNotNull { it.value?.toFloatOrNull() }.reversed()
 
             MacroData(latest, history)

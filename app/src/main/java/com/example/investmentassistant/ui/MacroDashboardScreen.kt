@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.investmentassistant.api.MacroData
 import com.example.investmentassistant.viewmodel.MacroViewModel
+import com.example.investmentassistant.viewmodel.TimeRange
 
 enum class MacroTab(val title: String) {
     PULSE("Market Pulse"),
@@ -41,6 +42,7 @@ fun MacroDashboardScreen(
     viewModel: MacroViewModel = viewModel()
 ) {
     var selectedTab by remember { mutableStateOf(MacroTab.PULSE) }
+    val selectedRange by viewModel.selectedRange.collectAsState()
 
     // ★ String 대신 최신값과 히스토리가 포함된 데이터를 관찰합니다 ★
     val us10yData by viewModel.us10yData.collectAsState()
@@ -104,12 +106,24 @@ fun MacroDashboardScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                TimeRange.values().forEach { range ->
+                    FilterChip(
+                        selected = selectedRange == range,
+                        onClick = { viewModel.updateRange(range) },
+                        label = { Text(range.label, fontSize = 12.sp) }
+                    )
+                }
+            }
             when (selectedTab) {
                 MacroTab.PULSE -> MarketPulseContent(us10yData, sp500Data, nasdaqData, dollarIndexData)
                 MacroTab.LIQUIDITY -> LiquidityContent(fedBalanceData, m2Data, realRateData)
                 MacroTab.RATES -> RatesContent(us10yData, us2yData)
                 MacroTab.RISK -> RiskContent(vixData, hySpreadData, fearGreedData)
-                MacroTab.ASSETS -> AssetsContent(btcData, goldData)
+                MacroTab.ASSETS -> AssetsContent(btcData, goldData, sp500Data, nasdaqData)
                 MacroTab.COMMODITY -> CommodityContent(wtiData, copperData)
                 MacroTab.KOREA -> KoreaContent(kospiData, usdkrwData)
                 MacroTab.INSIGHT -> InsightContent()
@@ -120,216 +134,277 @@ fun MacroDashboardScreen(
 
 // --- 각 탭별 UI 구현부 ---
 
+// ==========================================
+// 1. Market Pulse 탭
+// ==========================================
+// ==========================================
+// 1. Market Pulse 탭 (주식, 금리, 달러 종합)
+// ==========================================
 @Composable
 fun MarketPulseContent(
     us10yData: com.example.investmentassistant.api.MacroData,
     sp500Data: com.example.investmentassistant.api.MacroData,
     nasdaqData: com.example.investmentassistant.api.MacroData,
-    dollarIndexData: com.example.investmentassistant.api.MacroData // ★ 파라미터 추가
+    dollarIndexData: com.example.investmentassistant.api.MacroData
 ) {
-    val isYieldRising = if (us10yData.history.size > 1) {
-        (us10yData.history.lastOrNull() ?: 0f) > (us10yData.history.dropLast(1).lastOrNull() ?: 0f)
-    } else true
-
-    val statusText = if (isYieldRising) "Risk OFF (보수적)" else "Risk ON (긍정적)"
-    val statusColor = if (isYieldRising) Color(0xFFFF4444) else Color(0xFF4CAF50)
-
-    StatusCard(statusText, statusColor, "금리/달러 추이에 따른 현재 시장 심리 요약")
-
+    // 1. 각 지표별 상승/하락 여부 판단
     val isSp500Up = sp500Data.history.let { it.size > 1 && it.last() > it[it.size - 2] }
-    InfoRow("S&P 500", sp500Data.latestValue, "실시간", isSp500Up, sp500Data.history)
-
     val isNasdaqUp = nasdaqData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
+    val isYieldDown = us10yData.history.let { it.size > 1 && it.last() < it[it.size - 2] } // 금리 하락이 호재
+    val isDollarDown = dollarIndexData.history.let { it.size > 1 && it.last() < it[it.size - 2] } // 달러 하락이 호재
+
+    // 2. 호재(주식 상승, 금리/달러 하락) 개수 카운트
+    val bullScore = listOf(isSp500Up, isNasdaqUp, isYieldDown, isDollarDown).count { it }
+
+    // 3. 점수에 따른 종합 상태 결정
+    val (statusText, statusColor) = when {
+        bullScore >= 3 -> "강력한 Risk ON (위험 선호)" to Color(0xFF4CAF50) // 3개 이상 호재
+        bullScore == 2 -> "혼조세 (방향성 탐색 중)" to Color(0xFFFFA500) // 주황색
+        else -> "Risk OFF (안전 자산 선호)" to Color(0xFFFF4444) // 악재 우위
+    }
+
+    StatusCard(statusText, statusColor, "주식, 금리, 달러 동향 종합 심리")
+    GuideSection("미 국채 10년물 금리가 오르면 기술주/성장주에 악재로 작용합니다. 또한 달러 가치가 오르면(강달러) 외국인 자금이 미국으로 빠져나가 신흥국 증시와 가상자산에 부정적입니다.")
+
+    InfoRow("S&P 500", sp500Data.latestValue, "실시간", isSp500Up, sp500Data.history)
     InfoRow("NASDAQ", nasdaqData.latestValue, "실시간", isNasdaqUp, nasdaqData.history)
-
-    InfoRow("미 국채 10Y", us10yData.latestValue, "실시간", !isYieldRising, us10yData.history)
-
-    // ★ 가짜 데이터 삭제하고 진짜 달러 인덱스 연결!
-    val isDollarUp = dollarIndexData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
-    // (달러가 오르면 보통 시장에 악재이므로 색상을 파란색으로 하려면 !isDollarUp을 쓸 수도 있지만, 일단 상승=빨강 으로 통일합니다)
-    InfoRow("달러 인덱스", dollarIndexData.latestValue, "실시간 (DXY)", isDollarUp, dollarIndexData.history)
+    InfoRow("미 국채 10Y", us10yData.latestValue, "실시간", isYieldDown, us10yData.history)
+    InfoRow("달러 인덱스", dollarIndexData.latestValue, "실시간 (DXY)", !isDollarDown, dollarIndexData.history)
 }
+
+// ==========================================
+// 2. Liquidity 탭 (연준 자산, 통화량, 실질 금리 종합)
+// ==========================================
 @Composable
 fun LiquidityContent(
     fedData: com.example.investmentassistant.api.MacroData,
     m2Data: com.example.investmentassistant.api.MacroData,
-    realRateData: com.example.investmentassistant.api.MacroData // ★ 파라미터 추가
+    realRateData: com.example.investmentassistant.api.MacroData
 ) {
-    val isFedTightening = if (fedData.history.size > 1) {
-        (fedData.history.lastOrNull() ?: 0f) < (fedData.history.dropLast(1).lastOrNull() ?: 0f)
-    } else false
+    val isFedUp = fedData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
+    val isM2Up = m2Data.history.let { it.size > 1 && it.last() > it[it.size - 2] }
+    val isRealRateDown = realRateData.history.let { it.size > 1 && it.last() < it[it.size - 2] } // 실질 금리 하락이 유동성에 호재
 
-    val statusText = if (isFedTightening) "유동성 축소 중" else "유동성 횡보/확장"
-    val statusColor = if (isFedTightening) Color.Gray else Color(0xFF4CAF50)
+    val liquidityScore = listOf(isFedUp, isM2Up, isRealRateDown).count { it }
 
-    StatusCard(statusText, statusColor, "연준 대차대조표 및 실질금리 실시간 추이")
+    val (statusText, statusColor) = when {
+        liquidityScore >= 2 -> "유동성 확장 국면 (증시 호재)" to Color(0xFF4CAF50)
+        liquidityScore == 1 -> "유동성 중립 (관망세)" to Color(0xFFFFA500)
+        else -> "유동성 축소 국면 (긴축)" to Color.Gray
+    }
 
-    InfoRow(
-        label = "Fed 연준 자산",
-        value = fedData.latestValue,
-        subValue = "실시간 데이터",
-        isPositive = !isFedTightening,
-        history = fedData.history
-    )
+    StatusCard(statusText, statusColor, "연준 대차대조표 및 실질금리 종합")
+    GuideSection("연준 자산과 M2는 '시중에 풀린 돈의 양'입니다. 줄어들면(긴축) 자산 시장의 상승 동력이 떨어집니다. 체감 금리인 '실질 금리'가 상승하면 자금이 주식에서 채권으로 이동합니다.")
 
-    InfoRow(
-        label = "M2 통화량",
-        value = m2Data.latestValue,
-        subValue = "실시간 데이터",
-        isPositive = false,
-        history = m2Data.history
-    )
-
-    // ★ 3. 가짜 데이터 삭제하고 진짜 실질 금리 데이터와 그래프 적용
-    // (실질 금리 상승은 주식 시장에 악재이므로 파란색으로 표시하려면 isPositive를 조절할 수 있습니다)
-    InfoRow(
-        label = "실질 금리 (10Y)",
-        value = realRateData.latestValue,
-        subValue = "TIPS 기준 실시간",
-        isPositive = true, // 상승을 빨간색으로 표시
-        history = realRateData.history
-    )
+    InfoRow("Fed 연준 자산", fedData.latestValue, "실시간 데이터", isFedUp, fedData.history)
+    InfoRow("M2 통화량", m2Data.latestValue, "실시간 데이터", isM2Up, m2Data.history)
+    InfoRow("실질 금리 (10Y)", realRateData.latestValue, "TIPS 기준 실시간", !isRealRateDown, realRateData.history)
 }
+
+// ==========================================
+// 3. Rates 탭 (장단기 역전 여부 및 금리 추세 종합)
+// ==========================================
 @Composable
 fun RatesContent(
     data10y: com.example.investmentassistant.api.MacroData,
     data2y: com.example.investmentassistant.api.MacroData
 ) {
-    StatusCard("금리 압박 심화", Color(0xFFFFA500), "연준 통화정책의 핵심 지표")
-
-    InfoRow("미 국채 2Y", data2y.latestValue, "실시간 데이터", true, data2y.history)
-    InfoRow("미 국채 10Y", data10y.latestValue, "실시간 데이터", true, data10y.history)
-
-    // ★ 1. 최신 스프레드 값 계산
-    val spread = try {
+    val spreadVal = try {
         val y10 = data10y.latestValue.replace("%", "").toFloat()
         val y2 = data2y.latestValue.replace("%", "").toFloat()
-        String.format("%.2fp", y10 - y2)
-    } catch (e: Exception) { "-" }
+        y10 - y2
+    } catch (e: Exception) { 0f }
 
-    val isReversed = spread.startsWith("-")
+    val isReverted = spreadVal < 0
+    val is10yRising = data10y.history.let { it.size > 1 && it.last() > it[it.size - 2] }
 
-    // ★ 2. 과거 30일치 스프레드 추세 데이터(리스트) 생성
-    val spreadHistory = if (data10y.history.isNotEmpty() && data2y.history.isNotEmpty()) {
-        // 10년물 데이터와 2년물 데이터를 짝지어서 뺀 값을 새로운 리스트로 만듭니다.
-        // zip 함수는 두 리스트의 같은 순서(인덱스)에 있는 값들을 묶어줍니다.
-        data10y.history.zip(data2y.history) { y10, y2 ->
-            y10 - y2
-        }
-    } else {
-        emptyList()
+    val (statusText, statusColor) = when {
+        isReverted -> "침체 경고 (장단기 금리 역전)" to Color(0xFFFF4444)
+        is10yRising -> "장기 금리 상승기 (성장주 부담)" to Color(0xFFFFA500)
+        else -> "정상적인 수익률 곡선 (안정적)" to Color(0xFF4CAF50)
     }
 
-    // ★ 3. InfoRow에 스프레드 추세 데이터(spreadHistory) 전달
-    InfoRow(
-        label = "10Y-2Y 스프레드",
-        value = spread,
-        subValue = if (isReversed) "역전 상태 (침체 시그널)" else "정상",
-        isPositive = !isReversed,
-        history = spreadHistory // 여기에 우리가 방금 만든 리스트를 넣습니다!
-    )
+    StatusCard(statusText, statusColor, "수익률 곡선 및 통화정책 지표")
+    GuideSection("단기 금리(2Y)가 장기 금리(10Y)보다 높아지는 '역전 현상(마이너스)'이 발생하면, 보통 1~2년 내에 경제에 큰 위기나 경기 침체가 온다는 강력한 역사적 시그널입니다.")
+
+    InfoRow("미 국채 2Y", data2y.latestValue, "실시간 데이터", !is10yRising, data2y.history)
+    InfoRow("미 국채 10Y", data10y.latestValue, "실시간 데이터", !is10yRising, data10y.history)
+
+    val spreadHistory = if (data10y.history.isNotEmpty() && data2y.history.isNotEmpty()) {
+        data10y.history.zip(data2y.history) { y10, y2 -> y10 - y2 }
+    } else emptyList()
+    InfoRow("10Y-2Y 스프레드", String.format("%.2fp", spreadVal), if (isReverted) "역전 상태" else "정상", !isReverted, spreadHistory)
 }
-// (RiskContent, AssetsContent 등 나머지 탭은 기존과 동일하되 가짜 데이터 구조 유지)
+
+// ==========================================
+// 4. Risk 탭 (VIX, 하이일드, F&G 종합)
+// ==========================================
 @Composable
 fun RiskContent(
     vixData: com.example.investmentassistant.api.MacroData,
     hySpreadData: com.example.investmentassistant.api.MacroData,
-    // ★ 3. 세 번째 파라미터 추가!
     fearGreedData: com.example.investmentassistant.api.MacroData
 ) {
-    val vixValue = vixData.latestValue.replace(",", "").toFloatOrNull() ?: 0f
-    val isVixHigh = vixValue > 20f
+    val isVixHigh = (vixData.latestValue.toFloatOrNull() ?: 0f) > 20f
+    val isHyRising = hySpreadData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
+    val isFear = (fearGreedData.latestValue.toFloatOrNull() ?: 50f) < 45f // 45 이하면 공포
 
-    val statusText = if (isVixHigh) "공포 단계 (변동성 확대)" else "안정 단계 (위험 선호)"
-    val statusColor = if (isVixHigh) Color(0xFFFF4444) else Color(0xFF4CAF50)
+    // 리스크 요인(악재) 개수 카운트
+    val riskScore = listOf(isVixHigh, isHyRising, isFear).count { it }
 
-    StatusCard(statusText, statusColor, "VIX 지수 및 주요 리스크 지표 추이")
+    val (statusText, statusColor) = when {
+        riskScore >= 2 -> "시장 공포 및 변동성 확대" to Color(0xFFFF4444)
+        riskScore == 1 -> "리스크 요인 부분 발생 (주의)" to Color(0xFFFFA500)
+        else -> "안정적인 시장 심리 (위험 선호)" to Color(0xFF4CAF50)
+    }
 
-    val isVixUp = vixData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
-    InfoRow("VIX (공포지수)", vixData.latestValue, "실시간 데이터", !isVixUp, vixData.history)
+    StatusCard(statusText, statusColor, "VIX 및 기업 부도 위험 종합")
+    GuideSection("VIX는 시장의 '공포'를 나타냅니다. 20이 넘으면 경계해야 합니다. 하이일드 스프레드가 치솟으면 한계 기업들의 연쇄 부도 위험이 커졌다는 뜻입니다.")
 
-    val isHyUp = hySpreadData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
-    InfoRow("하이일드 스프레드", hySpreadData.latestValue, "실시간 (FRED)", !isHyUp, hySpreadData.history)
+    InfoRow("VIX (공포지수)", vixData.latestValue, "실시간 데이터", !isVixHigh, vixData.history)
+    InfoRow("하이일드 스프레드", hySpreadData.latestValue, "실시간 (FRED)", !isHyRising, hySpreadData.history)
 
-    // ★ 4. 가짜 데이터 지우고 진짜 Fear & Greed 연결!
-    val fngValue = fearGreedData.latestValue.toFloatOrNull() ?: 50f
-    // 수치가 50 이상이면 탐욕(Greed), 미만이면 공포(Fear)
-    val fngStatus = if (fngValue > 50) "탐욕 구간" else "공포 구간"
-    // 수치가 오르는 것(탐욕으로 가는 것)을 초록색으로 표시할지, 빨간색으로 표시할지 설정
-    // 보통 탐욕은 위험(빨강) 또는 긍정(초록)으로 해석되는데, 여기서는 상승을 파란색(과열 경고)으로 뒤집지 않고 기본 방향성(!isHyUp처럼 역상관이 아님)으로 두겠습니다.
+    val fngStatus = if (isFear) "공포 구간" else "중립/탐욕 구간"
     val isFngUp = fearGreedData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
-
     InfoRow("Fear & Greed", fearGreedData.latestValue, fngStatus, isFngUp, fearGreedData.history)
 }
 
+// ==========================================
+// 5. Assets 탭 (비트코인, 금, 나스닥 RS 종합)
+// ==========================================
 @Composable
 fun AssetsContent(
     btcData: com.example.investmentassistant.api.MacroData,
-    goldData: com.example.investmentassistant.api.MacroData
+    goldData: com.example.investmentassistant.api.MacroData,
+    sp500Data: com.example.investmentassistant.api.MacroData,
+    nasdaqData: com.example.investmentassistant.api.MacroData
 ) {
-    StatusCard("디지털 vs 전통 안전 자산", Color(0xFF4CAF50), "비트코인과 금 가격 실시간 추이")
-
     val isBtcUp = btcData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
-    InfoRow("비트코인", "$${btcData.latestValue}", "실시간 (BTC-USD)", isBtcUp, btcData.history)
-
     val isGoldUp = goldData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
-    InfoRow("금 (Gold)", "$${goldData.latestValue}", "실시간 선물 (GC=F)", isGoldUp, goldData.history)
 
-    // 나스닥 상대강도는 추가 연산이 필요하므로 틀만 남김
-    InfoRow("나스닥 상대강도", "약세", "추후 연동 필요", false)
+    val rsHistory = if (sp500Data.history.isNotEmpty() && nasdaqData.history.isNotEmpty()) {
+        sp500Data.history.zip(nasdaqData.history) { sp, ndq -> if (sp != 0f) ndq / sp else 0f }
+    } else emptyList()
+    val isNasdaqOutperforming = if (rsHistory.size > 1) rsHistory.last() > rsHistory.first() else false
+
+    val (statusText, statusColor) = when {
+        isNasdaqOutperforming && isBtcUp -> "위험 자산(기술/코인) 랠리" to Color(0xFF4CAF50)
+        isGoldUp && !isBtcUp -> "안전 자산(금) 선호 심리" to Color(0xFFFFA500)
+        else -> "자산별 차별화 장세" to Color.Gray
+    }
+
+    StatusCard(statusText, statusColor, "디지털 vs 전통 자산 흐름 종합")
+    GuideSection("금은 인플레이션이나 위기 발생 시 오르는 전통적 방어 자산입니다. 나스닥 상대강도(Outperform)가 뜬다면, 증시 자금이 '빅테크' 위주로만 쏠리고 있다는 뜻입니다.")
+
+    InfoRow("비트코인", "$${btcData.latestValue}", "실시간 (BTC-USD)", isBtcUp, btcData.history)
+    InfoRow("금 (Gold)", "$${goldData.latestValue}", "실시간 선물 (GC=F)", isGoldUp, goldData.history)
+    InfoRow("나스닥 상대강도", if (isNasdaqOutperforming) "Outperform" else "Underperform", if (isNasdaqOutperforming) "강세 (빅테크 주도)" else "약세", isNasdaqOutperforming, rsHistory)
 }
 
+// ==========================================
+// 6. Commodity 탭 (유가, 구리 종합)
+// ==========================================
 @Composable
 fun CommodityContent(
     wtiData: com.example.investmentassistant.api.MacroData,
     copperData: com.example.investmentassistant.api.MacroData
 ) {
-    StatusCard("인플레이션 & 경기 선행 지표", Color(0xFFFFA500), "에너지(유가) 및 산업금속(구리) 동향")
-
     val isWtiUp = wtiData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
-    InfoRow("WTI 원유", "$${wtiData.latestValue}", "실시간 선물 (CL=F)", isWtiUp, wtiData.history)
-
     val isCopperUp = copperData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
+
+    val (statusText, statusColor) = when {
+        isWtiUp && isCopperUp -> "경기 회복 기대 및 인플레 압력" to Color(0xFFFF4444) // 유가 동반 상승은 인플레 우려(빨강)
+        !isWtiUp && !isCopperUp -> "물가 압력 완화 (안정화)" to Color(0xFF4CAF50)
+        else -> "에너지/산업금속 혼조세" to Color(0xFFFFA500)
+    }
+
+    StatusCard(statusText, statusColor, "에너지 및 산업금속 동향 종합")
+    GuideSection("WTI 유가가 오르면 물가가 다시 뛰어올라 연준이 금리를 내리기 힘들어집니다. 구리는 '닥터 코퍼'로 불리며, 가격 상승은 공장이 돌아가고 실물 경기가 살아나고 있다는 청신호입니다.")
+
+    InfoRow("WTI 원유", "$${wtiData.latestValue}", "실시간 선물 (CL=F)", isWtiUp, wtiData.history)
     InfoRow("구리 (Copper)", "$${copperData.latestValue}", "실시간 선물 (HG=F)", isCopperUp, copperData.history)
 }
 
+// ==========================================
+// 7. Korea 탭 (코스피, 환율 종합)
+// ==========================================
 @Composable
 fun KoreaContent(
     kospiData: com.example.investmentassistant.api.MacroData,
     usdkrwData: com.example.investmentassistant.api.MacroData
 ) {
-    // 환율이 1350원을 넘으면 경고(빨간색)로 표시
-    val krwValue = usdkrwData.latestValue.replace(",", "").toFloatOrNull() ?: 0f
-    val isFxHigh = krwValue > 1350f
-
-    val statusText = if (isFxHigh) "국장 주의보 (환율 불안정)" else "안정적 환율 흐름"
-    val statusColor = if (isFxHigh) Color(0xFFFF4444) else Color(0xFF4CAF50)
-
-    StatusCard(statusText, statusColor, "코스피 지수 및 원/달러 환율 추이")
-
+    val isFxHigh = (usdkrwData.latestValue.replace(",", "").toFloatOrNull() ?: 0f) > 1350f
     val isKospiUp = kospiData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
+
+    val (statusText, statusColor) = when {
+        isFxHigh && !isKospiUp -> "국장 투자 매력도 하락 (환율/증시 이중고)" to Color(0xFFFF4444)
+        !isFxHigh && isKospiUp -> "안정적 환율 및 증시 상승 기대" to Color(0xFF4CAF50)
+        else -> "환율/증시 힘겨루기 중" to Color(0xFFFFA500)
+    }
+
+    StatusCard(statusText, statusColor, "코스피 및 환율 추이 종합")
+    GuideSection("환율이 크게 오르면(원화 가치 하락), 외국인 투자자들은 가만히 있어도 손해(환차손)를 보기 때문에 한국 주식을 팔고 달러로 바꿔서 떠나는 핵심 원인이 됩니다.")
+
     InfoRow("KOSPI", kospiData.latestValue, "실시간 (^KS11)", isKospiUp, kospiData.history)
-
-    val isUsdkrwUp = usdkrwData.history.let { it.size > 1 && it.last() > it[it.size - 2] }
-    // 환율 상승은 국장에 악재이므로 빨간색으로 표시하기 위해 !isUsdkrwUp 사용
-    InfoRow("원/달러 환율", "₩${usdkrwData.latestValue}", "실시간 (KRW=X)", !isUsdkrwUp, usdkrwData.history)
-
-    // 외국인 수급은 증권사 API(미래에셋 등)가 필요하므로 일단 틀만 남김
-    InfoRow("외국인 수급", "연동 대기중", "증권사 API 필요", false)
+    InfoRow("원/달러 환율", "₩${usdkrwData.latestValue}", "실시간 (KRW=X)", !isFxHigh, usdkrwData.history) // 환율 상승은 악재
+    InfoRow("외국인 수급", if (isKospiUp) "+3,240억" else "-4,150억", "모의 데이터 (미래에셋 대기)", isKospiUp)
 }
-
+// ==========================================
+// ★ Insight (AI 분석) 탭
+// ==========================================
 @Composable
-fun InsightContent() {
+fun InsightContent(viewModel: MacroViewModel = viewModel()) {
+    // 뷰모델에서 AI 상태 가져오기
+    val insightText by viewModel.aiInsight.collectAsState()
+    val isInsightLoading by viewModel.isInsightLoading.collectAsState()
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("💡 AI 투자 행동 지침", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            HorizontalDivider()
-            InsightItem("현재 현금 비중 40% 이상 확보 권고")
-            InsightItem("고금리 지속 시 기술주 비중 축소, 방어주 검토")
-            InsightItem("VIX 30 돌파 전까지는 공격적 매수 지양")
+        Column(modifier = Modifier.padding(20.dp)) {
+            // 헤더 영역
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🧠", fontSize = 24.sp, modifier = Modifier.padding(end = 8.dp))
+                    Text(
+                        text = "AI 매크로 리포트",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // 로딩 중일 때 뺑뺑이 표시
+                if (isInsightLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+            // AI 분석 텍스트 출력 영역
+            Text(
+                text = insightText,
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 24.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 분석 시작 버튼
+            Button(
+                onClick = { viewModel.generateAiInsight() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isInsightLoading // 로딩 중에는 버튼 비활성화
+            ) {
+                Text(if (insightText.contains("시작하세요")) "실시간 지표 분석하기" else "최신 데이터로 재분석")
+            }
         }
     }
 }
@@ -436,5 +511,27 @@ fun InsightItem(text: String) {
         Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.width(8.dp))
         Text(text = text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+fun GuideSection(guideText: String) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(modifier = Modifier.padding(12.dp)) {
+            Text("💡", modifier = Modifier.padding(end = 8.dp))
+            Text(
+                text = guideText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp
+            )
+        }
     }
 }

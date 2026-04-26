@@ -5,6 +5,7 @@ import com.example.investmentassistant.model.NewsArticle
 import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.example.investmentassistant.utils.TokenManager // 상단에 임포트 추가
 
 class AiService {
     private val generativeModel = GenerativeModel(
@@ -38,6 +39,10 @@ class AiService {
                 """.trimIndent()
 
                 val response = generativeModel.generateContent(prompt)
+                val usage = response.usageMetadata
+                if (usage != null) {
+                    TokenManager.addTokens(usage.totalTokenCount)
+                }
                 response.text ?: "리포트 생성에 실패했습니다."
             } catch (e: Exception) {
                 e.printStackTrace()

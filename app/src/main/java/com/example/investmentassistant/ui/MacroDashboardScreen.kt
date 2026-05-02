@@ -24,7 +24,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.investmentassistant.api.MacroData
 import com.example.investmentassistant.viewmodel.MacroViewModel
 import com.example.investmentassistant.viewmodel.TimeRange
-
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import com.example.investmentassistant.data.AppDatabase
+import com.example.investmentassistant.data.SavedReport
+import androidx.compose.ui.platform.LocalContext
 enum class MacroTab(val title: String) {
     PULSE("Market Pulse"),
     LIQUIDITY("Liquidity"),
@@ -354,9 +359,31 @@ fun KoreaContent(
 // ==========================================
 @Composable
 fun InsightContent(viewModel: MacroViewModel = viewModel()) {
-    // 뷰모델에서 AI 상태 가져오기
     val insightText by viewModel.aiInsight.collectAsState()
     val isInsightLoading by viewModel.isInsightLoading.collectAsState()
+    val tokenUsage by viewModel.tokenUsage.collectAsState()
+
+    val context = LocalContext.current
+    val db = remember { AppDatabase.getDatabase(context) }
+
+    // ★ 신규 추가: AI 답변이 완성되면 알아서 낚아채서 저장하는 자동화 로직!
+    LaunchedEffect(insightText) {
+        // "시작하세요"나 "분석 중" 같은 기본 안내 멘트가 아닐 때만 작동
+        if (insightText.isNotBlank() && !insightText.contains("시작하세요") && !insightText.contains("분석 중")) {
+            // 1. 똑같은 리포트가 이미 창고에 있는지 확인 (중복 방지)
+            val exists = db.reportDao().isReportExists(insightText)
+
+            // 2. 없다면 새 리포트로 자동 저장!
+            if (!exists) {
+                val report = SavedReport(
+                    type = "MACRO",
+                    title = "거시경제 종합 리포트", // 테마(제목) 저장
+                    content = insightText
+                )
+                db.reportDao().insertReport(report)
+            }
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -364,7 +391,6 @@ fun InsightContent(viewModel: MacroViewModel = viewModel()) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            // 헤더 영역
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -372,14 +398,8 @@ fun InsightContent(viewModel: MacroViewModel = viewModel()) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("🧠", fontSize = 24.sp, modifier = Modifier.padding(end = 8.dp))
-                    Text(
-                        text = "AI 매크로 리포트",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("AI 매크로 리포트", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
-
-                // 로딩 중일 때 뺑뺑이 표시
                 if (isInsightLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                 }
@@ -387,21 +407,27 @@ fun InsightContent(viewModel: MacroViewModel = viewModel()) {
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
-            // AI 분석 텍스트 출력 영역
-            Text(
-                text = insightText,
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 24.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Text(text = insightText, style = MaterialTheme.typography.bodyMedium, lineHeight = 24.sp)
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.height(24.dp))
+            if (!insightText.contains("시작하세요") && !insightText.contains("분석 중")) {
+                Text(
+                    text = tokenUsage,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                )
+            }
 
-            // 분석 시작 버튼
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ★ 스크랩 버튼 제거 완료! (재분석 버튼만 혼자 꽉 차게 남김)
             Button(
-                onClick = { viewModel.generateAiInsight() },
+                // ★ viewModel 호출 시 context 전달
+                onClick = { viewModel.generateAiInsight(context) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isInsightLoading // 로딩 중에는 버튼 비활성화
+                enabled = !isInsightLoading
             ) {
                 Text(if (insightText.contains("시작하세요")) "실시간 지표 분석하기" else "최신 데이터로 재분석")
             }

@@ -20,6 +20,7 @@ import com.example.investmentassistant.viewmodel.DateRange
 import com.example.investmentassistant.viewmodel.NewsViewModel
 import com.halilibo.richtext.commonmark.Markdown
 import com.halilibo.richtext.ui.material3.RichText
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,7 +32,7 @@ fun NewsSearchScreen(
     val newsList by viewModel.newsList.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val generatedReport by viewModel.generatedReport.collectAsState()
-
+    val context = LocalContext.current
     val selectedDateRange by viewModel.selectedDateRange.collectAsState()
     val customDays by viewModel.customDays.collectAsState()
 
@@ -43,7 +44,7 @@ fun NewsSearchScreen(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { viewModel.searchNews() })
+            keyboardActions = KeyboardActions(onSearch = { viewModel.searchNews(context) })
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -77,7 +78,8 @@ fun NewsSearchScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = { viewModel.searchNews() },
+            // ★ onClick에 context 전달
+            onClick = { viewModel.searchNews(context) },
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading && searchQuery.isNotBlank()
         ) {

@@ -11,9 +11,11 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-// ★ TokenManager 임포트 추가!
 import com.example.investmentassistant.utils.TokenManager
-
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.platform.LocalContext
+import com.example.investmentassistant.data.AppDatabase
 @Composable
 fun MainAppScreen() {
     val navController = rememberNavController()
@@ -22,24 +24,37 @@ fun MainAppScreen() {
         navController = navController,
         startDestination = "menu"
     ) {
+        // 1. 대문 화면
         composable("menu") {
             MenuScreen(
                 onNavigateToDashboard = { navController.navigate("dashboard") },
-                onNavigateToNews = { navController.navigate("news") }
+                onNavigateToNews = { navController.navigate("news") },
+                // ★ 에러 원인 해결: 보관함 이동 연결선 추가!
+                onNavigateToSaved = { navController.navigate("saved") }
             )
         }
+        // 2. 대시보드 화면
         composable("dashboard") {
             MacroDashboardScreen()
         }
+        // 3. 뉴스 화면
         composable("news") {
             NewsSearchScreen()
+        }
+        // 4. ★ 신규 추가: 보관함 화면
+        composable("saved") {
+            SavedReportsScreen(onBackClick = { navController.popBackStack() })
         }
     }
 }
 
 // ▼ 대문(메뉴) 화면 UI ▼
 @Composable
-fun MenuScreen(onNavigateToDashboard: () -> Unit, onNavigateToNews: () -> Unit) {
+fun MenuScreen(
+    onNavigateToDashboard: () -> Unit,
+    onNavigateToNews: () -> Unit,
+    onNavigateToSaved: () -> Unit // ★ 파라미터 추가
+) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -49,10 +64,8 @@ fun MenuScreen(onNavigateToDashboard: () -> Unit, onNavigateToNews: () -> Unit) 
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 위쪽 여백으로 중앙을 약간 아래로 밀어줌
             Spacer(modifier = Modifier.weight(1f))
 
-            // 앱 타이틀
             Text(
                 text = "ApexInsight",
                 style = MaterialTheme.typography.displaySmall,
@@ -67,71 +80,81 @@ fun MenuScreen(onNavigateToDashboard: () -> Unit, onNavigateToNews: () -> Unit) 
 
             Spacer(modifier = Modifier.height(60.dp))
 
-            // 대시보드 이동 버튼
             Button(
                 onClick = onNavigateToDashboard,
-                modifier = Modifier
-                    .fillMaxWidth(0.7f)
-                    .height(60.dp)
+                modifier = Modifier.fillMaxWidth(0.7f).height(60.dp)
             ) {
                 Text("📊 매크로 대시보드", style = MaterialTheme.typography.titleMedium)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 뉴스 이동 버튼
             Button(
                 onClick = onNavigateToNews,
-                modifier = Modifier
-                    .fillMaxWidth(0.7f)
-                    .height(60.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary
-                )
+                modifier = Modifier.fillMaxWidth(0.7f).height(60.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
             ) {
                 Text("📰 뉴스 검색 및 요약", style = MaterialTheme.typography.titleMedium)
             }
 
-            // ★ 아래쪽 남은 공간을 밀어내서 버튼을 맨 밑으로 보냄
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ★ 보관함 이동 버튼
+            OutlinedButton(
+                onClick = onNavigateToSaved,
+                modifier = Modifier.fillMaxWidth(0.7f).height(60.dp)
+            ) {
+                Text("🗂️ 나의 리포트 보관함", style = MaterialTheme.typography.titleMedium)
+            }
+
             Spacer(modifier = Modifier.weight(1f))
-
-            // ★ 여기에 토큰 확인 팝업 버튼 추가!
             TokenUsageButton()
-
-            // 화면 맨 밑바닥 여백
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
-// ▼ 토큰 사용량을 보여주는 팝업 버튼 컴포넌트 ▼
+// ▼ 토큰 팝업 컴포넌트 ▼
 @Composable
 fun TokenUsageButton() {
     var showDialog by remember { mutableStateOf(false) }
-    val totalTokens by TokenManager.totalTokens.collectAsState()
 
-    TextButton(
-        onClick = { showDialog = true }
-    ) {
-        Text("📊 AI 토큰 누적 사용량 확인", style = MaterialTheme.typography.labelLarge)
+    // ★ DB에서 실시간으로 토큰 기록 가져오기
+    val context = LocalContext.current
+    val db = remember { AppDatabase.getDatabase(context) }
+    val tokenRecords by db.tokenDao().getAllTokenRecords().collectAsState(initial = emptyList())
+
+    TextButton(onClick = { showDialog = true }) {
+        Text("📊 일별 AI 토큰 사용량 확인", style = MaterialTheme.typography.labelLarge)
     }
 
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("AI 토큰 사용 현황", fontWeight = FontWeight.Bold) },
+            title = { Text("일별 토큰 사용 현황", fontWeight = FontWeight.Bold) },
             text = {
-                Text(
-                    text = "앱 실행 후 현재까지 뉴스 분석과 매크로 리포트에 사용된 총 토큰은\n\n" +
-                            "🔥 $totalTokens Tokens\n\n" +
-                            "입니다.",
-                    lineHeight = 22.sp
-                )
+                if (tokenRecords.isEmpty()) {
+                    Text("아직 사용 기록이 없습니다.")
+                } else {
+                    // 리스트 형태로 날짜 - 사용량 띄우기
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(tokenRecords) { record ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(record.date, fontWeight = FontWeight.Medium)
+                                Text("🔥 ${record.totalTokens}", color = MaterialTheme.colorScheme.primary)
+                            }
+                            HorizontalDivider()
+                        }
+                    }
+                }
             },
             confirmButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text("확인")
-                }
+                TextButton(onClick = { showDialog = false }) { Text("닫기") }
             }
         )
     }

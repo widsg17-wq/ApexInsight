@@ -1,5 +1,5 @@
 package com.example.investmentassistant.viewmodel
-
+import android.content.Context // (상단에 임포트 필요할 수 있습니다)
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.investmentassistant.api.FredApiService
@@ -13,10 +13,7 @@ import com.example.investmentassistant.api.FinanceApiService
 import com.example.investmentassistant.api.RealFinanceApiService
 import com.example.investmentassistant.api.FngApiService
 import com.example.investmentassistant.api.RealFngApiService
-import com.example.investmentassistant.BuildConfig // (API 키 가져오기용)
-import com.google.ai.client.generativeai.GenerativeModel // (Gemini SDK)
-import com.google.ai.client.generativeai.type.content
-import com.example.investmentassistant.utils.TokenManager // 상단에 임포트 추가
+import com.example.investmentassistant.api.AiService
 
 enum class TimeRange(val label: String, val fredLimit: Int, val yahooRange: String, val yahooInterval: String) {
     W1("1W", 7, "5d", "1h"),
@@ -27,6 +24,7 @@ enum class TimeRange(val label: String, val fredLimit: Int, val yahooRange: Stri
 }
 
 class MacroViewModel(
+    private val aiService: AiService = AiService(),
     private val fredApiService: FredApiService = RealFredApiService() ,
     private val financeApiService: FinanceApiService = RealFinanceApiService() ,
     private val fngApiService: FngApiService = RealFngApiService()
@@ -94,7 +92,8 @@ class MacroViewModel(
 
     private val _dollarIndexData = MutableStateFlow(MacroData("-", emptyList()))
     val dollarIndexData: StateFlow<MacroData> = _dollarIndexData.asStateFlow()
-
+    private val _tokenUsage = MutableStateFlow("토큰 사용량: -")
+    val tokenUsage: StateFlow<String> = _tokenUsage.asStateFlow()
     init {
         fetchMacroData()
     }
@@ -171,26 +170,20 @@ class MacroViewModel(
     }
 
     // ★ Gemini AI 분석 실행 함수 ★
-    fun generateAiInsight() {
+    fun generateAiInsight(context: Context) {
         viewModelScope.launch {
             _isInsightLoading.value = true
             _aiInsight.value = "수석 이코노미스트 AI가 13개 지표를 분석 중입니다...\n(최대 10~15초 소요)"
 
             try {
-                // 1. Gemini 모델 준비 (gemini-1.5-flash 모델 사용)
-                val generativeModel = GenerativeModel(
-                    modelName = "gemini-2.5-flash",
-                    apiKey = BuildConfig.GEMINI_API_KEY // local.properties에 설정한 키
-                )
-
-                // 2. 현재 수집된 모든 데이터를 하나의 프롬프트로 엮어줍니다.
+                // 1. 프롬프트 작성 (데이터는 기존과 동일하게 가져옴)
                 val prompt = """
                     당신은 월스트리트의 수석 이코노미스트이자 매크로 투자 전문가입니다.
                     다음은 현재 시장의 주요 거시경제 지표 실시간 데이터입니다.
 
                     [금리 및 유동성]
                     미 국채 10년물: ${_us10yData.value.latestValue}
-                    10Y-2Y 스프레드 추이 (역전여부 확인): ${_us10yData.value.latestValue} - ${_us2yData.value.latestValue}
+                    10Y-2Y 스프레드 추이: ${_us10yData.value.latestValue} - ${_us2yData.value.latestValue}
                     연준 자산(유동성): ${_fedBalanceData.value.latestValue}
                     실질 금리: ${_realRateData.value.latestValue}
 
@@ -208,25 +201,21 @@ class MacroViewModel(
 
                     [시장 심리 및 리스크]
                     VIX(공포지수): ${_vixData.value.latestValue}
-                    하이일드 스프레드(부도위험): ${_hySpreadData.value.latestValue}
-                    Fear & Greed (코인심리): ${_fearGreedData.value.latestValue}
+                    하이일드 스프레드: ${_hySpreadData.value.latestValue}
+                    Fear & Greed: ${_fearGreedData.value.latestValue}
 
-                    위 데이터를 바탕으로 한국의 개인 투자자를 위해 다음 3가지를 명확하게 분석해주세요.
+                    위 데이터를 바탕으로 한국의 개인 투자자를 위해 다음 3가지를 분석해주세요.
                     1. 📊 현재 글로벌 매크로 상황 요약 (3줄 이내)
-                    2. 🎯 자산 시장(주식/코인) 단기 방향성 전망
+                    2. 🎯 자산 시장 단기 방향성 전망
                     3. ⚠️ 현재 가장 주의해야 할 핵심 리스크 요인
-                    
-                    *전문적이지만 이해하기 쉽게, '-습니다/입니다' 체로 작성해주세요.*
                 """.trimIndent()
 
-                // 3. Gemini에게 질문 던지기
-                val response = generativeModel.generateContent(prompt)
-                val usage = response.usageMetadata
-                if (usage != null) {
-                    TokenManager.addTokens(usage.totalTokenCount)
-                }
-                // 4. 결과를 화면 상태에 업데이트
-                _aiInsight.value = response.text ?: "분석 결과를 받아오지 못했습니다."
+                // 2. AiService에 분석 요청 및 결과 수신 (텍스트 + 토큰영수증 세트로 받음)
+                val result = aiService.generateMacroInsight(context, prompt)
+
+                // 3. 결과를 화면 상태에 업데이트
+                _aiInsight.value = result.text
+                _tokenUsage.value = result.tokenUsageStr
 
             } catch (e: Exception) {
                 e.printStackTrace()

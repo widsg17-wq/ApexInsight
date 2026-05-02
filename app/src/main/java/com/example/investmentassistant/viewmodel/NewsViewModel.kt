@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-
+import android.content.Context // import 추가
 // 기간 선택 옵션 정의
 enum class DateRange(val label: String) {
     ALL("전체"),
@@ -58,7 +58,8 @@ class NewsViewModel(
         }
     }
 
-    fun searchNews() {
+    // ★ 파라미터에 context: Context 추가
+    fun searchNews(context: Context) {
         val query = _searchQuery.value
         val range = _selectedDateRange.value
         if (query.isBlank()) return
@@ -87,8 +88,9 @@ class NewsViewModel(
                 _newsList.value = results
 
                 if (results.isNotEmpty()) {
-                    val report = aiService.generateReport(results, query)
-                    _generatedReport.value = report
+                    // ★ AiService 호출 시 context 전달 및 .text 추출
+                    val result = aiService.generateReport(context, results, query)
+                    _generatedReport.value = result.text
                 }
             } catch (e: Exception) {
                 _newsList.value = emptyList()

@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.investmentassistant.data.WatchedKeyword
 import com.example.investmentassistant.viewmodel.WatchedKeywordsViewModel
@@ -30,57 +31,72 @@ fun WatchedKeywordsScreen(
     val keywords by viewModel.keywords.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("자동 리포트 구독", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "키워드 추가")
-            }
-        },
-    ) { padding ->
-        if (keywords.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(bottom = bottomPadding.calculateBottomPadding()),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🔔", style = MaterialTheme.typography.displayMedium)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "구독 중인 키워드가 없습니다.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        "+ 버튼으로 키워드를 추가하면 자동으로 리포트를 생성합니다.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("자동 리포트 구독", fontWeight = FontWeight.Bold) },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                )
+            },
+        ) { padding ->
+            if (keywords.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(bottom = bottomPadding.calculateBottomPadding()),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("🔔", style = MaterialTheme.typography.displayMedium)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "구독 중인 키워드가 없습니다.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "우하단 + 버튼을 눌러 키워드를 추가하세요.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            "설정한 주기마다 자동으로 AI 리포트를 생성합니다.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(bottom = bottomPadding.calculateBottomPadding()),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(keywords, key = { it.id }) { kw ->
+                        KeywordCard(kw = kw, onDelete = { viewModel.deleteKeyword(kw) })
+                    }
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(bottom = bottomPadding.calculateBottomPadding()),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(keywords, key = { it.id }) { kw ->
-                    KeywordCard(kw = kw, onDelete = { viewModel.deleteKeyword(kw) })
-                }
-            }
+        }
+
+        // FAB을 Box로 직접 위치시켜 바텀 네비게이션 바 위에 올바르게 표시
+        FloatingActionButton(
+            onClick = { showAddDialog = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp)
+                .padding(bottom = bottomPadding.calculateBottomPadding() + 16.dp)
+                .zIndex(1f),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "키워드 추가")
         }
     }
 

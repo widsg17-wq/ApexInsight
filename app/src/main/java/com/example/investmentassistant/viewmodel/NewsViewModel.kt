@@ -1,10 +1,12 @@
 package com.example.investmentassistant.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.investmentassistant.api.AiService
-import com.example.investmentassistant.api.ApiService
-import com.example.investmentassistant.api.RealApiService
+import com.example.investmentassistant.data.repository.AiRepository
+import com.example.investmentassistant.data.repository.NewsRepository
+import com.example.investmentassistant.data.repository.ReportRepository
+import com.example.investmentassistant.model.DateRange
 import com.example.investmentassistant.model.NewsArticle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,19 +14,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import android.content.Context // import 추가
-// 기간 선택 옵션 정의
-enum class DateRange(val label: String) {
-    ALL("전체"),
-    PAST_WEEK("최근 1주일"),
-    PAST_MONTH("최근 1개월"),
-    CUSTOM("직접 설정")
+
+sealed interface NewsUiState {
+    data object Idle : NewsUiState
+    data object Loading : NewsUiState
+    data class Success(val articles: List<NewsArticle>, val report: String) : NewsUiState
+    data class Error(val message: String) : NewsUiState
 }
 
-class NewsViewModel(
-    private val apiService: ApiService = RealApiService(),
-    private val aiService: AiService = AiService()
-) : ViewModel() {
+class NewsViewModel(app: Application) : AndroidViewModel(app) {
+
+    private val newsRepository: NewsRepository = NewsRepository()
+    private val aiRepository: AiRepository = AiRepository()
+    private val reportRepository: ReportRepository = ReportRepository(app)
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -35,68 +37,45 @@ class NewsViewModel(
     private val _customDays = MutableStateFlow("3")
     val customDays: StateFlow<String> = _customDays.asStateFlow()
 
-    private val _newsList = MutableStateFlow<List<NewsArticle>>(emptyList())
-    val newsList: StateFlow<List<NewsArticle>> = _newsList.asStateFlow()
+    private val _uiState = MutableStateFlow<NewsUiState>(NewsUiState.Idle)
+    val uiState: StateFlow<NewsUiState> = _uiState.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    fun updateSearchQuery(query: String) { _searchQuery.value = query }
+    fun updateDateRange(range: DateRange) { _selectedDateRange.value = range }
+    fun updateCustomDays(days: String) { if (days.all { it.isDigit() }) _customDays.value = days }
 
-    private val _generatedReport = MutableStateFlow<String>("")
-    val generatedReport: StateFlow<String> = _generatedReport.asStateFlow()
-
-    fun updateSearchQuery(query: String) {
-        _searchQuery.value = query
-    }
-
-    fun updateDateRange(range: DateRange) {
-        _selectedDateRange.value = range
-    }
-
-    fun updateCustomDays(days: String) {
-        if (days.all { it.isDigit() }) {
-            _customDays.value = days
-        }
-    }
-
-    // ★ 파라미터에 context: Context 추가
-    fun searchNews(context: Context) {
+    fun searchNews() {
         val query = _searchQuery.value
-        val range = _selectedDateRange.value
         if (query.isBlank()) return
 
         viewModelScope.launch {
-            _isLoading.value = true
-            _generatedReport.value = ""
+            _uiState.value = NewsUiState.Loading
 
-            // 날짜 계산 로직
             val today = LocalDate.now()
-            val formatter = DateTimeFormatter.ISO_DATE
-            var fromDate: String? = null
-            var toDate: String? = today.format(formatter)
+            val fmt = DateTimeFormatter.ISO_DATE
+            val daysInput = _customDays.value.toIntOrNull() ?: 3
 
-            val daysInput = _customDays.value.toIntOrNull() ?: 0
-
-            when (range) {
-                DateRange.PAST_WEEK -> fromDate = today.minusWeeks(1).format(formatter)
-                DateRange.PAST_MONTH -> fromDate = today.minusMonths(1).format(formatter)
-                DateRange.CUSTOM -> fromDate = today.minusDays(daysInput.toLong()).format(formatter)
-                DateRange.ALL -> { fromDate = null; toDate = null }
+            val (fromDate, toDate) = when (_selectedDateRange.value) {
+                DateRange.PAST_WEEK -> today.minusWeeks(1).format(fmt) to today.format(fmt)
+                DateRange.PAST_MONTH -> today.minusMonths(1).format(fmt) to today.format(fmt)
+                DateRange.CUSTOM -> today.minusDays(daysInput.toLong()).format(fmt) to today.format(fmt)
+                DateRange.ALL -> null to null
             }
 
             try {
-                val results = apiService.searchNews(query, fromDate, toDate)
-                _newsList.value = results
+                val articles = newsRepository.searchNews(query, fromDate, toDate)
+                val report = if (articles.isNotEmpty()) {
+                    val result = aiRepository.generateNewsReport(articles, query)
+                    reportRepository.addTokens(result.tokenCount)
+                    if (!reportRepository.isReportExists(result.text)) {
+                        reportRepository.saveReport("NEWS", query, result.text)
+                    }
+                    result.text
+                } else ""
 
-                if (results.isNotEmpty()) {
-                    // ★ AiService 호출 시 context 전달 및 .text 추출
-                    val result = aiService.generateReport(context, results, query)
-                    _generatedReport.value = result.text
-                }
+                _uiState.value = NewsUiState.Success(articles, report)
             } catch (e: Exception) {
-                _newsList.value = emptyList()
-                _generatedReport.value = "리포트 생성 실패: ${e.localizedMessage}"
-            } finally {
-                _isLoading.value = false
+                _uiState.value = NewsUiState.Error("검색 실패: ${e.localizedMessage}")
             }
         }
     }

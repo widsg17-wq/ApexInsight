@@ -12,6 +12,7 @@ if (localPropertiesFile.exists()) {
 }
 val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
 val fredApiKey = localProperties.getProperty("FRED_API_KEY") ?: ""
+val newsApiKey = localProperties.getProperty("NEWS_API_KEY") ?: ""
 
 android {
     namespace = "com.example.investmentassistant"
@@ -30,6 +31,7 @@ android {
         }
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
         buildConfigField("String", "FRED_API_KEY", "\"$fredApiKey\"")
+        buildConfigField("String", "NEWS_API_KEY", "\"$newsApiKey\"")
     }
 
     buildTypes {
@@ -64,6 +66,7 @@ android {
 
 dependencies {
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -92,7 +95,6 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
-    implementation(libs.generativeai)
     implementation(libs.compose.richtext.commonmark)
     implementation(libs.compose.richtext.ui.material3)
     implementation("androidx.navigation:navigation-compose:2.7.7")

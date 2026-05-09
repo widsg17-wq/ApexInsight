@@ -1,124 +1,181 @@
 package com.example.investmentassistant.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.investmentassistant.data.AppDatabase
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.investmentassistant.data.SavedReport
-import kotlinx.coroutines.launch
+import com.example.investmentassistant.data.TokenRecord
+import com.example.investmentassistant.viewmodel.SavedReportsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.foundation.clickable
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SavedReportsScreen(onBackClick: () -> Unit) {
-    val context = LocalContext.current
-    val db = AppDatabase.getDatabase(context)
-    val coroutineScope = rememberCoroutineScope()
-
-    // ★ 핵심: 창고(DB)에 있는 모든 데이터를 실시간으로 가져옵니다.
-    val reports by db.reportDao().getAllReports().collectAsState(initial = emptyList())
+fun SavedReportsScreen(
+    bottomPadding: PaddingValues = PaddingValues(),
+    viewModel: SavedReportsViewModel = viewModel(),
+) {
+    val reports by viewModel.reports.collectAsState()
+    val tokenRecords by viewModel.tokenRecords.collectAsState()
+    var showTokenDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text("나의 리포트 보관함", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "뒤로 가기")
+                actions = {
+                    TextButton(onClick = { showTokenDialog = true }) {
+                        Text("토큰 현황", style = MaterialTheme.typography.labelLarge)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
             )
-        }
+        },
     ) { padding ->
         if (reports.isEmpty()) {
-            // 저장된 리포트가 없을 때 보여줄 화면
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("아직 저장된 리포트가 없습니다.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(bottom = bottomPadding.calculateBottomPadding()),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("🗂️", style = MaterialTheme.typography.displayMedium)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "아직 저장된 리포트가 없습니다.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "뉴스 검색 또는 매크로 AI 분석 후 자동 저장됩니다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         } else {
-            // 저장된 리포트가 있을 때: 스크롤 가능한 리스트(LazyColumn)로 띄워줍니다.
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(bottom = bottomPadding.calculateBottomPadding()),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(reports) { report ->
-                    ReportCard(report = report, onDelete = {
-                        coroutineScope.launch { db.reportDao().deleteReport(report) }
-                    })
+                items(reports, key = { it.id }) { report ->
+                    ReportCard(
+                        report = report,
+                        onDelete = { viewModel.deleteReport(report) },
+                    )
                 }
             }
         }
     }
+
+    if (showTokenDialog) {
+        TokenUsageDialog(records = tokenRecords, onDismiss = { showTokenDialog = false })
+    }
 }
 
-// 리포트 1개를 예쁘게 보여주는 카드 디자인
 @Composable
-fun ReportCard(report: SavedReport, onDelete: () -> Unit) {
-    // 카드가 펼쳐졌는지 여부를 기억하는 상태 변수
+private fun ReportCard(report: SavedReport, onDelete: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-
-    val dateFormat = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA)
-    val dateString = dateFormat.format(Date(report.savedAt))
+    val dateString = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(report.savedAt))
+    val typeLabel = if (report.type == "MACRO") "📊 매크로" else "📰 뉴스"
 
     Card(
-        // ★ 클릭할 때마다 expanded 상태를 반전시킴!
-        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 왼쪽: 생성 날짜와 테마(제목)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = report.title, // 테마 노출
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = typeLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = dateString,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = dateString, // 생성 날짜 노출
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = report.title,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodyLarge,
                     )
                 }
-
-                // 오른쪽: 삭제 버튼
-                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Delete, contentDescription = "삭제", tint = MaterialTheme.colorScheme.error)
                 }
             }
 
-            // ★ 카드를 터치해서 expanded가 true가 되면 내용이 펼쳐짐!
             if (expanded) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                 Text(
                     text = report.content,
                     style = MaterialTheme.typography.bodyMedium,
-                    lineHeight = 22.sp
+                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
                 )
             }
         }
     }
+}
+
+@Composable
+private fun TokenUsageDialog(records: List<TokenRecord>, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("일별 토큰 사용 현황", fontWeight = FontWeight.Bold) },
+        text = {
+            if (records.isEmpty()) {
+                Text("아직 사용 기록이 없습니다.")
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(records) { record ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(record.date, fontWeight = FontWeight.Medium)
+                            Text("🔥 ${record.totalTokens}", color = MaterialTheme.colorScheme.primary)
+                        }
+                        HorizontalDivider()
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("닫기") }
+        },
+    )
 }

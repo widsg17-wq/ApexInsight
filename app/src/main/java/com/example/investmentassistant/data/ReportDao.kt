@@ -26,4 +26,8 @@ interface ReportDao {
     // 4. 리포트 삭제하기
     @Delete
     suspend fun deleteReport(report: SavedReport)
+
+    // 5. 특정 키워드 자동 리포트 중 가장 최근 것 (급변 감지용)
+    @Query("SELECT * FROM saved_reports WHERE title = '[자동] ' || :keyword ORDER BY savedAt DESC LIMIT 1")
+    suspend fun getLatestAutoReportByKeyword(keyword: String): SavedReport?
 }

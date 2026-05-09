@@ -43,6 +43,9 @@ class AutoReportWorker(
                     dateFormat.format(Date(now - intervalMs))
                 }
 
+                // 신규 리포트 생성 전에 직전 리포트 조회
+                val previousReport = reportRepo.getLatestAutoReportByKeyword(kw.keyword)
+
                 val articles = newsRepo.searchNews(kw.keyword, fromDate, null)
                 if (articles.isNotEmpty()) {
                     val result = aiRepo.generateNewsReport(articles, kw.keyword)
@@ -50,6 +53,16 @@ class AutoReportWorker(
                         reportRepo.saveReport("NEWS", "[자동] ${kw.keyword}", result.text)
                         reportRepo.addTokens(result.tokenCount)
                         generatedKeywords.add(kw.keyword)
+
+                        // 직전 리포트가 있으면 급변 감지
+                        if (previousReport != null) {
+                            val changeDesc = aiRepo.detectSignificantChange(
+                                previousReport.content, result.text, kw.keyword,
+                            )
+                            if (changeDesc != null) {
+                                sendChangeAlert(kw.keyword, changeDesc)
+                            }
+                        }
                     }
                 }
                 db.watchedKeywordDao().updateKeyword(kw.copy(lastRunAt = now))
@@ -86,9 +99,32 @@ class AutoReportWorker(
         manager.notify(NOTIFICATION_ID, notification)
     }
 
+    private fun sendChangeAlert(keyword: String, changeDescription: String) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val channel = NotificationChannel(
+            ALERT_CHANNEL_ID,
+            "급변 감지 알림",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply { description = "리포트 내용 급변 감지 알림" }
+        manager.createNotificationChannel(channel)
+
+        val notification = NotificationCompat.Builder(context, ALERT_CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("⚠️ [$keyword] 시장 급변 감지")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(changeDescription))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+
+        manager.notify(ALERT_NOTIFICATION_ID, notification)
+    }
+
     companion object {
         const val CHANNEL_ID = "auto_report_channel"
         const val NOTIFICATION_ID = 1001
+        const val ALERT_CHANNEL_ID = "change_alert_channel"
+        const val ALERT_NOTIFICATION_ID = 1002
         const val WORK_NAME = "auto_report_work"
     }
 }

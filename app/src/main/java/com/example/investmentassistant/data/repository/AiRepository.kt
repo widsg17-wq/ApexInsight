@@ -12,6 +12,8 @@ data class AiResult(val text: String, val tokenCount: Int, val tokenUsageStr: St
 interface AiRepository {
     suspend fun generateNewsReport(articles: List<NewsArticle>, searchQuery: String): AiResult
     suspend fun generateMacroInsight(indicators: MacroIndicators): AiResult
+    // 직전 리포트와 신규 리포트를 비교해 급변 여부 감지. 급변 시 변화 요약 반환, 없으면 null
+    suspend fun detectSignificantChange(previousReport: String, newReport: String, keyword: String): String?
 }
 
 private class AiRepositoryImpl : AiRepository {
@@ -82,6 +84,32 @@ private class AiRepositoryImpl : AiRepository {
         """.trimIndent()
 
         return call(prompt)
+    }
+
+    override suspend fun detectSignificantChange(
+        previousReport: String,
+        newReport: String,
+        keyword: String,
+    ): String? = withContext(Dispatchers.IO) {
+        try {
+            val prompt = """
+                두 투자 리포트를 비교하여 '$keyword' 관련 투자자 관점에서 중요한 변화가 있는지 판단해줘.
+                중요한 변화(시장 방향성 전환, 새로운 리스크 등장, 투자 심리 급변 등)가 있다면 한국어로 1-2문장으로 핵심만 설명해줘.
+                중요한 변화가 없다면 정확히 "NO_CHANGE"라고만 답해줘.
+
+                [이전 리포트]
+                ${previousReport.take(2000)}
+
+                [신규 리포트]
+                ${newReport.take(2000)}
+            """.trimIndent()
+
+            val response = model.generateContent(prompt)
+            val result = response.text?.trim() ?: return@withContext null
+            if (result == "NO_CHANGE") null else result
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private suspend fun call(prompt: String): AiResult = withContext(Dispatchers.IO) {

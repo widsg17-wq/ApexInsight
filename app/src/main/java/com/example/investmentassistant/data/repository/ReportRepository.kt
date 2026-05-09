@@ -16,6 +16,7 @@ interface ReportRepository {
     suspend fun deleteReport(report: SavedReport)
     fun getTokenRecords(): Flow<List<TokenRecord>>
     suspend fun addTokens(usedTokens: Int)
+    suspend fun getLatestAutoReportByKeyword(keyword: String): SavedReport?
 }
 
 private class ReportRepositoryImpl(context: Context) : ReportRepository {
@@ -35,6 +36,9 @@ private class ReportRepositoryImpl(context: Context) : ReportRepository {
 
     override fun getTokenRecords(): Flow<List<TokenRecord>> =
         db.tokenDao().getAllTokenRecords()
+
+    override suspend fun getLatestAutoReportByKeyword(keyword: String): SavedReport? =
+        db.reportDao().getLatestAutoReportByKeyword(keyword)
 
     override suspend fun addTokens(usedTokens: Int) {
         if (usedTokens <= 0) return

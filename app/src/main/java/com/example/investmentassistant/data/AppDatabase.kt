@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [SavedReport::class, TokenRecord::class, WatchedKeyword::class],
-    version = 3,
+    entities = [SavedReport::class, TokenRecord::class, WatchedKeyword::class, IndicatorSnapshot::class],
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -17,6 +17,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun reportDao(): ReportDao
     abstract fun tokenDao(): TokenDao
     abstract fun watchedKeywordDao(): WatchedKeywordDao
+    abstract fun indicatorSnapshotDao(): IndicatorSnapshotDao
 
     companion object {
         @Volatile
@@ -37,6 +38,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS indicator_snapshots (
+                        key TEXT PRIMARY KEY NOT NULL,
+                        value REAL NOT NULL,
+                        savedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -44,7 +59,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "investment_assistant_db",
                 )
-                    .addMigrations(MIGRATION_2_3)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance

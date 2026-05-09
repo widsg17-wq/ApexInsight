@@ -29,6 +29,7 @@ fun WatchedKeywordsScreen(
     viewModel: WatchedKeywordsViewModel = viewModel(),
 ) {
     val keywords by viewModel.keywords.collectAsState()
+    val indicatorAlertEnabled by viewModel.indicatorAlertEnabled.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -42,44 +43,48 @@ fun WatchedKeywordsScreen(
                 )
             },
         ) { padding ->
-            if (keywords.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(bottom = bottomPadding.calculateBottomPadding()),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🔔", style = MaterialTheme.typography.displayMedium)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "구독 중인 키워드가 없습니다.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "우하단 + 버튼을 눌러 키워드를 추가하세요.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            "설정한 주기마다 자동으로 AI 리포트를 생성합니다.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(bottom = bottomPadding.calculateBottomPadding()),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // 지표 급변 알림 토글 카드 (항상 상단에 표시)
+                item {
+                    IndicatorAlertCard(
+                        enabled = indicatorAlertEnabled,
+                        onToggle = { viewModel.toggleIndicatorAlert(it) },
+                    )
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(bottom = bottomPadding.calculateBottomPadding()),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
+
+                if (keywords.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("📰", style = MaterialTheme.typography.displayMedium)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "구독 중인 키워드가 없습니다.",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "우하단 + 버튼을 눌러 키워드를 추가하세요.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                } else {
                     items(keywords, key = { it.id }) { kw ->
                         KeywordCard(kw = kw, onDelete = { viewModel.deleteKeyword(kw) })
                     }
@@ -108,6 +113,48 @@ fun WatchedKeywordsScreen(
             },
             onDismiss = { showAddDialog = false },
         )
+    }
+}
+
+@Composable
+private fun IndicatorAlertCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (enabled)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            else
+                MaterialTheme.colorScheme.surface,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "📊 지표 급변 알림",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "VIX, S&P500, 환율 등 주요 지표가 급변하면 알림",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "1시간마다 체크 · 지표별 임계값 초과 시 발송",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onToggle)
+        }
     }
 }
 

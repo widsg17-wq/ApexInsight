@@ -30,6 +30,7 @@ fun WatchedKeywordsScreen(
 ) {
     val keywords by viewModel.keywords.collectAsState()
     val indicatorAlertEnabled by viewModel.indicatorAlertEnabled.collectAsState()
+    val investmentAlertEnabled by viewModel.investmentAlertEnabled.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -51,11 +52,18 @@ fun WatchedKeywordsScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // 지표 급변 알림 토글 카드 (항상 상단에 표시)
+                // 지표 급변 알림 토글 카드
                 item {
                     IndicatorAlertCard(
                         enabled = indicatorAlertEnabled,
                         onToggle = { viewModel.toggleIndicatorAlert(it) },
+                    )
+                }
+                // 투자 포인트 알림 토글 카드
+                item {
+                    InvestmentSignalCard(
+                        enabled = investmentAlertEnabled,
+                        onToggle = { viewModel.toggleInvestmentAlert(it) },
                     )
                 }
 
@@ -149,6 +157,48 @@ private fun IndicatorAlertCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
                 )
                 Text(
                     text = "1시간마다 체크 · 지표별 임계값 초과 시 발송",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onToggle)
+        }
+    }
+}
+
+@Composable
+private fun InvestmentSignalCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (enabled)
+                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+            else
+                MaterialTheme.colorScheme.surface,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "🎯 투자 포인트 알림",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "AI가 현재 지표를 분석해 매수/매도 포인트 감지",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "1시간마다 체크 · 신호 발생 시 알림 발송",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

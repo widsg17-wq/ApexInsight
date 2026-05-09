@@ -14,6 +14,8 @@ interface AiRepository {
     suspend fun generateMacroInsight(indicators: MacroIndicators): AiResult
     // 직전 리포트와 신규 리포트를 비교해 급변 여부 감지. 급변 시 변화 요약 반환, 없으면 null
     suspend fun detectSignificantChange(previousReport: String, newReport: String, keyword: String): String?
+    // 현재 지표를 분석해 투자 포인트 반환. 신호 없으면 null
+    suspend fun detectInvestmentOpportunity(indicators: MacroIndicators): String?
 }
 
 private class AiRepositoryImpl : AiRepository {
@@ -85,6 +87,37 @@ private class AiRepositoryImpl : AiRepository {
 
         return call(prompt)
     }
+
+    override suspend fun detectInvestmentOpportunity(indicators: MacroIndicators): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val prompt = """
+                    당신은 월스트리트의 수석 투자 전략가입니다. 아래 현재 시장 지표를 분석하여 단기적으로 주목할 만한 투자 포인트(매수/매도 기회)가 있는지 판단해주세요.
+
+                    [현재 주요 지표]
+                    S&P 500: ${indicators.sp500.latestValue}
+                    나스닥: ${indicators.nasdaq.latestValue}
+                    VIX 공포지수: ${indicators.vix.latestValue}
+                    Fear & Greed: ${indicators.fearGreed.latestValue}
+                    미 국채 10년물: ${indicators.us10y.latestValue}
+                    달러 인덱스: ${indicators.dollarIndex.latestValue}
+                    금(Gold): ${"$"}${indicators.gold.latestValue}
+                    비트코인: ${"$"}${indicators.btc.latestValue}
+                    WTI 원유: ${"$"}${indicators.wti.latestValue}
+                    원/달러 환율: ₩${indicators.usdkrw.latestValue}
+                    코스피: ${indicators.kospi.latestValue}
+
+                    투자 포인트가 있다면 "🎯 [자산]: [간단한 이유]" 형태로 1~3개만 답하세요.
+                    특별한 투자 포인트가 없다면 정확히 "NO_SIGNAL"이라고만 답하세요.
+                """.trimIndent()
+
+                val response = model.generateContent(prompt)
+                val result = response.text?.trim() ?: return@withContext null
+                if (result == "NO_SIGNAL") null else result
+            } catch (e: Exception) {
+                null
+            }
+        }
 
     override suspend fun detectSignificantChange(
         previousReport: String,

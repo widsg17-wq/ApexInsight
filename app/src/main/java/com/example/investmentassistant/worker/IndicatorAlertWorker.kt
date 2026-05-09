@@ -9,6 +9,7 @@ import androidx.work.WorkerParameters
 import com.example.investmentassistant.R
 import com.example.investmentassistant.data.AppDatabase
 import com.example.investmentassistant.data.IndicatorSnapshot
+import com.example.investmentassistant.data.repository.AiRepository
 import com.example.investmentassistant.data.repository.MacroRepository
 import com.example.investmentassistant.model.MacroIndicators
 import com.example.investmentassistant.model.TimeRange
@@ -20,7 +21,9 @@ class IndicatorAlertWorker(
 
     override suspend fun doWork(): Result {
         val db = AppDatabase.getDatabase(context)
+        val prefs = context.getSharedPreferences("alert_prefs", Context.MODE_PRIVATE)
         val macroRepo = MacroRepository()
+        val aiRepo = AiRepository()
 
         val current = try {
             macroRepo.fetchAllIndicators(TimeRange.W1)
@@ -31,8 +34,8 @@ class IndicatorAlertWorker(
         val currentMap = current.toMap()
         val previous = db.indicatorSnapshotDao().getAll().associateBy { it.key }
 
+        // 지표 급변 체크
         val alerts = mutableListOf<String>()
-
         currentMap.forEach { (key, currentVal) ->
             val prevSnapshot = previous[key] ?: return@forEach
             val prevVal = prevSnapshot.value
@@ -55,6 +58,14 @@ class IndicatorAlertWorker(
 
         if (alerts.isNotEmpty()) {
             sendNotification(alerts)
+        }
+
+        // 투자 포인트 감지 (토글이 켜진 경우)
+        if (prefs.getBoolean("investment_alert_enabled", false)) {
+            val signal = aiRepo.detectInvestmentOpportunity(current)
+            if (signal != null) {
+                sendInvestmentSignalNotification(signal)
+            }
         }
 
         return Result.success()
@@ -82,9 +93,32 @@ class IndicatorAlertWorker(
         manager.notify(NOTIFICATION_ID, notification)
     }
 
+    private fun sendInvestmentSignalNotification(signal: String) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val channel = NotificationChannel(
+            SIGNAL_CHANNEL_ID,
+            "투자 포인트 알림",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply { description = "AI 투자 포인트 감지 알림" }
+        manager.createNotificationChannel(channel)
+
+        val notification = NotificationCompat.Builder(context, SIGNAL_CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("🎯 투자 포인트 감지")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(signal))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+
+        manager.notify(SIGNAL_NOTIFICATION_ID, notification)
+    }
+
     companion object {
         const val CHANNEL_ID = "indicator_alert_channel"
         const val NOTIFICATION_ID = 1003
+        const val SIGNAL_CHANNEL_ID = "investment_signal_channel"
+        const val SIGNAL_NOTIFICATION_ID = 1004
         const val WORK_NAME = "indicator_alert_work"
 
         // 각 지표별 알림 임계값 (%)

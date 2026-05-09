@@ -35,6 +35,11 @@ class WatchedKeywordsViewModel(app: Application) : AndroidViewModel(app) {
     )
     val indicatorAlertEnabled: StateFlow<Boolean> = _indicatorAlertEnabled.asStateFlow()
 
+    private val _investmentAlertEnabled = MutableStateFlow(
+        prefs.getBoolean("investment_alert_enabled", false)
+    )
+    val investmentAlertEnabled: StateFlow<Boolean> = _investmentAlertEnabled.asStateFlow()
+
     fun addKeyword(keyword: String, intervalHours: Int) {
         if (keyword.isBlank()) return
         viewModelScope.launch {
@@ -51,7 +56,14 @@ class WatchedKeywordsViewModel(app: Application) : AndroidViewModel(app) {
         _indicatorAlertEnabled.value = enabled
         prefs.edit().putBoolean("indicator_alert_enabled", enabled).apply()
         if (enabled) scheduleIndicatorAlertWorker()
-        else workManager.cancelUniqueWork(IndicatorAlertWorker.WORK_NAME)
+        else if (!_investmentAlertEnabled.value) workManager.cancelUniqueWork(IndicatorAlertWorker.WORK_NAME)
+    }
+
+    fun toggleInvestmentAlert(enabled: Boolean) {
+        _investmentAlertEnabled.value = enabled
+        prefs.edit().putBoolean("investment_alert_enabled", enabled).apply()
+        if (enabled) scheduleIndicatorAlertWorker()
+        else if (!_indicatorAlertEnabled.value) workManager.cancelUniqueWork(IndicatorAlertWorker.WORK_NAME)
     }
 
     private fun scheduleAutoReportWorker() {

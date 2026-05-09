@@ -3,6 +3,7 @@ package com.example.investmentassistant.ui
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,6 +19,7 @@ private enum class TopDest(val label: String, val icon: ImageVector, val route: 
     DASHBOARD("대시보드", Icons.Default.Home, "dashboard"),
     NEWS("뉴스 검색", Icons.Default.Search, "news"),
     ARCHIVE("보관함", Icons.Default.Bookmark, "archive"),
+    SUBSCRIBE("구독", Icons.Default.Notifications, "subscribe"),
 }
 
 @Composable
@@ -39,6 +41,9 @@ fun MainAppScreen() {
             }
             composable(TopDest.ARCHIVE.route) {
                 SavedReportsScreen(bottomPadding = padding)
+            }
+            composable(TopDest.SUBSCRIBE.route) {
+                WatchedKeywordsScreen(bottomPadding = padding)
             }
         }
     }

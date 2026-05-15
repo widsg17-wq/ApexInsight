@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [SavedReport::class, TokenRecord::class, WatchedKeyword::class, IndicatorSnapshot::class],
-    version = 4,
+    entities = [SavedReport::class, TokenRecord::class, WatchedKeyword::class, IndicatorSnapshot::class, CalendarEventEntity::class],
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -18,6 +18,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tokenDao(): TokenDao
     abstract fun watchedKeywordDao(): WatchedKeywordDao
     abstract fun indicatorSnapshotDao(): IndicatorSnapshotDao
+    abstract fun calendarEventDao(): CalendarEventDao
 
     companion object {
         @Volatile
@@ -52,6 +53,33 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS calendar_events (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        type TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        country TEXT NOT NULL,
+                        scheduledAt INTEGER NOT NULL,
+                        previous TEXT,
+                        forecast TEXT,
+                        actual TEXT,
+                        importance TEXT NOT NULL,
+                        ticker TEXT,
+                        earningsTime TEXT,
+                        epsActual REAL,
+                        epsEstimate REAL,
+                        revenueActual INTEGER,
+                        revenueEstimate INTEGER,
+                        isNotified INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -59,7 +87,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "investment_assistant_db",
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                 INSTANCE = instance
                 instance

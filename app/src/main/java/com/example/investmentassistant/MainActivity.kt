@@ -12,8 +12,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-
+import androidx.work.*
 import com.example.investmentassistant.ui.MainAppScreen
+import com.example.investmentassistant.worker.CalendarNotificationWorker
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
 
@@ -25,6 +27,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         requestNotificationPermissionIfNeeded()
+        scheduleCalendarNotificationWorker()
 
         setContent {
             MaterialTheme {
@@ -36,6 +39,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun scheduleCalendarNotificationWorker() {
+        val request = PeriodicWorkRequestBuilder<CalendarNotificationWorker>(30, TimeUnit.MINUTES)
+            .setConstraints(Constraints(requiredNetworkType = NetworkType.CONNECTED))
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            CalendarNotificationWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
     }
 
     private fun requestNotificationPermissionIfNeeded() {

@@ -1,21 +1,32 @@
 package com.example.investmentassistant
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 
 import com.example.investmentassistant.ui.MainAppScreen
-// 에러를 일으키던 Theme import 줄을 과감히 삭제했습니다!
 
 class MainActivity : ComponentActivity() {
+
+    private val requestNotificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* 권한 허용 여부와 무관하게 앱은 정상 실행 */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        requestNotificationPermissionIfNeeded()
+
         setContent {
-            // 커스텀 테마 대신 안드로이드 기본 MaterialTheme을 사용합니다.
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -25,5 +36,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) return
+
+        requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

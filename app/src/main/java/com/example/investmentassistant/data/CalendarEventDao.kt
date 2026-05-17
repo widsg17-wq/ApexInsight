@@ -19,6 +19,9 @@ interface CalendarEventDao {
     @Query("UPDATE calendar_events SET isNotified = 1 WHERE id IN (:ids)")
     suspend fun markAsNotified(ids: List<String>)
 
+    @Query("SELECT id FROM calendar_events WHERE isNotified = 1")
+    suspend fun getNotifiedEventIds(): List<String>
+
     @Query("DELETE FROM calendar_events WHERE scheduledAt < :beforeMs")
     suspend fun deleteOldEvents(beforeMs: Long)
 }

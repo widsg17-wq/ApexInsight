@@ -62,7 +62,12 @@ class CalendarRepository(private val dao: CalendarEventDao) {
         if (errors.size == 2) throw RuntimeException(errors.joinToString("\n"))
 
         if (events.isNotEmpty()) {
-            dao.upsertAll(events.map { it.toEntity() })
+            val notifiedIds = dao.getNotifiedEventIds().toHashSet()
+            dao.upsertAll(events.map { event ->
+                event.toEntity().let {
+                    if (it.id in notifiedIds) it.copy(isNotified = 1) else it
+                }
+            })
         }
 
         val cutoff = today.minusDays(14).atStartOfDay(kst).toInstant().toEpochMilli()
@@ -90,15 +95,17 @@ class CalendarRepository(private val dao: CalendarEventDao) {
             "medium" -> EventImportance.MEDIUM
             else -> EventImportance.LOW
         }
+        val effectiveUnit = unit?.takeIf { it.isNotBlank() }
+            ?: if (PERCENTAGE_KEYWORDS.any { event.lowercase().contains(it) }) "%" else null
         return CalendarEvent(
             id = "eco_${time}_${event.replace(" ", "_")}",
             type = EventType.ECONOMIC,
             title = toKoreanTitle(event),
             country = country,
             scheduledAt = ms,
-            previous = formatValue(prev, unit),
-            forecast = formatValue(estimate, unit),
-            actual = formatValue(actual, unit),
+            previous = formatValue(prev, effectiveUnit),
+            forecast = formatValue(estimate, effectiveUnit),
+            actual = formatValue(actual, effectiveUnit),
             importance = importance,
         )
     }
@@ -163,6 +170,11 @@ class CalendarRepository(private val dao: CalendarEventDao) {
 
         val TOP_TICKERS = setOf("NVDA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "005930.KS")
 
+        val PERCENTAGE_KEYWORDS = listOf(
+            "cpi", "ppi", "pce", "gdp", "unemployment", "inflation",
+            "pmi", "ism", "retail sales", "rate", "nfp", "nonfarm", "payroll",
+        )
+
         val IMPORTANT_KEYWORDS = listOf(
             "CPI", "PPI", "Fed", "FOMC", "GDP", "NFP", "Unemployment",
             "PCE", "ISM", "Retail Sales", "Rate Decision", "Interest Rate",
@@ -214,8 +226,14 @@ class CalendarRepository(private val dao: CalendarEventDao) {
 
         fun toKoreanTitle(event: String): String {
             val lower = event.lowercase()
+            val suffix = when {
+                lower.contains("mom") || lower.contains("m/m") -> " (월간)"
+                lower.contains("yoy") || lower.contains("y/y") -> " (연간)"
+                lower.contains("qoq") || lower.contains("q/q") -> " (분기)"
+                else -> ""
+            }
             EVENT_NAMES.forEach { (key, value) ->
-                if (lower.contains(key)) return value
+                if (lower.contains(key)) return value + suffix
             }
             return event
         }

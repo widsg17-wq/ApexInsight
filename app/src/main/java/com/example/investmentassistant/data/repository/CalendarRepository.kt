@@ -2,8 +2,8 @@ package com.example.investmentassistant.data.repository
 
 import com.example.investmentassistant.BuildConfig
 import com.example.investmentassistant.api.CalendarService
-import com.example.investmentassistant.api.FmpEarningsEvent
-import com.example.investmentassistant.api.FmpEconomicEvent
+import com.example.investmentassistant.api.FinnhubEarningsEvent
+import com.example.investmentassistant.api.FinnhubEconomicEvent
 import com.example.investmentassistant.data.CalendarEventDao
 import com.example.investmentassistant.data.toEntity
 import com.example.investmentassistant.model.CalendarEvent
@@ -20,7 +20,7 @@ class CalendarRepository(private val dao: CalendarEventDao) {
 
     private val service: CalendarService by lazy {
         Retrofit.Builder()
-            .baseUrl("https://financialmodelingprep.com/api/")
+            .baseUrl("https://finnhub.io/api/v1/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(CalendarService::class.java)
@@ -31,28 +31,35 @@ class CalendarRepository(private val dao: CalendarEventDao) {
     private val dateTimeFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
     suspend fun fetchAndCacheCalendar() {
-        val apiKey = BuildConfig.FMP_API_KEY
-        if (apiKey.isBlank()) return
+        val apiKey = BuildConfig.FINNHUB_API_KEY
+        if (apiKey.isBlank()) throw IllegalStateException("FINNHUB_API_KEY가 설정되지 않았습니다.")
 
         val today = LocalDate.now(kst)
         val from = today.minusDays(1).format(dateFmt)
-        val to = today.plusDays(14).format(dateFmt)
+        val to = today.plusDays(60).format(dateFmt)
 
         val events = mutableListOf<CalendarEvent>()
+        val errors = mutableListOf<String>()
 
         try {
-            val economic = service.getEconomicCalendar(from, to, apiKey)
-            events += economic
+            val response = service.getEconomicCalendar(apiKey)
+            events += (response.economicCalendar ?: emptyList())
                 .filter { isHighImpact(it) }
                 .mapNotNull { it.toCalendarEvent() }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            errors += "경제 캘린더: ${e.message}"
+        }
 
         try {
-            val earnings = service.getEarningsCalendar(from, to, apiKey)
-            events += earnings
+            val response = service.getEarningsCalendar(from, to, apiKey)
+            events += (response.earningsCalendar ?: emptyList())
                 .filter { it.symbol in MAJOR_TICKERS }
                 .mapNotNull { it.toCalendarEvent() }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            errors += "실적 캘린더: ${e.message}"
+        }
+
+        if (errors.size == 2) throw RuntimeException(errors.joinToString("\n"))
 
         if (events.isNotEmpty()) {
             dao.upsertAll(events.map { it.toEntity() })
@@ -70,35 +77,35 @@ class CalendarRepository(private val dao: CalendarEventDao) {
 
     suspend fun markAsNotified(ids: List<String>) = dao.markAsNotified(ids)
 
-    private fun isHighImpact(event: FmpEconomicEvent): Boolean {
-        val isHigh = event.impact?.equals("High", ignoreCase = true) == true
+    private fun isHighImpact(event: FinnhubEconomicEvent): Boolean {
+        val isHigh = event.impact?.equals("high", ignoreCase = true) == true
         val isImportantKeyword = IMPORTANT_KEYWORDS.any { event.event.contains(it, ignoreCase = true) }
         return isHigh || isImportantKeyword
     }
 
-    private fun FmpEconomicEvent.toCalendarEvent(): CalendarEvent? {
-        val ms = parseDateTime(date) ?: return null
+    private fun FinnhubEconomicEvent.toCalendarEvent(): CalendarEvent? {
+        val ms = parseDateTime(time) ?: return null
         val importance = when (impact?.lowercase()) {
             "high" -> EventImportance.HIGH
             "medium" -> EventImportance.MEDIUM
             else -> EventImportance.LOW
         }
         return CalendarEvent(
-            id = "eco_${date}_${event.replace(" ", "_")}",
+            id = "eco_${time}_${event.replace(" ", "_")}",
             type = EventType.ECONOMIC,
             title = toKoreanTitle(event),
             country = country,
             scheduledAt = ms,
-            previous = previous,
-            forecast = estimate,
-            actual = actual,
+            previous = formatValue(prev, unit),
+            forecast = formatValue(estimate, unit),
+            actual = formatValue(actual, unit),
             importance = importance,
         )
     }
 
-    private fun FmpEarningsEvent.toCalendarEvent(): CalendarEvent? {
+    private fun FinnhubEarningsEvent.toCalendarEvent(): CalendarEvent? {
         val ms = parseDate(date) ?: return null
-        val timeLabel = when (time?.lowercase()) {
+        val timeLabel = when (hour?.lowercase()) {
             "bmo" -> "장 시작 전"
             "amc" -> "장 마감 후"
             "dmh" -> "장중"
@@ -112,12 +119,22 @@ class CalendarRepository(private val dao: CalendarEventDao) {
             scheduledAt = ms,
             ticker = symbol,
             earningsTime = timeLabel,
-            epsActual = eps,
-            epsEstimate = epsEstimated,
-            revenueActual = revenue,
-            revenueEstimate = revenueEstimated,
+            epsActual = epsActual,
+            epsEstimate = epsEstimate,
+            revenueActual = revenueActual,
+            revenueEstimate = revenueEstimate,
             importance = if (symbol in TOP_TICKERS) EventImportance.HIGH else EventImportance.MEDIUM,
         )
+    }
+
+    private fun formatValue(value: Double?, unit: String?): String? {
+        value ?: return null
+        val formatted = if (value == kotlin.math.floor(value) && !value.isInfinite()) {
+            value.toLong().toString()
+        } else {
+            "%.2f".format(value)
+        }
+        return if (!unit.isNullOrBlank()) "$formatted$unit" else formatted
     }
 
     private fun parseDateTime(dateStr: String): Long? = try {

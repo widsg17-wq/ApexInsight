@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 
 data class CalendarUiState(
@@ -18,6 +19,10 @@ data class CalendarUiState(
     val todayEvents: List<CalendarEvent> = emptyList(),
     val tomorrowEvents: List<CalendarEvent> = emptyList(),
     val thisWeekEvents: List<CalendarEvent> = emptyList(),
+    val currentMonth: YearMonth = YearMonth.now(ZoneId.of("Asia/Seoul")),
+    val monthlyEvents: Map<LocalDate, List<CalendarEvent>> = emptyMap(),
+    val selectedDate: LocalDate? = null,
+    val selectedDateEvents: List<CalendarEvent> = emptyList(),
     val error: String? = null,
 )
 
@@ -38,14 +43,37 @@ class CalendarViewModel(app: Application) : AndroidViewModel(app) {
     fun load() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            var fetchError: String? = null
             try {
                 repository.fetchAndCacheCalendar()
-            } catch (_: Exception) {}
-            refreshFromDb()
+            } catch (e: Exception) {
+                fetchError = e.message
+            }
+            refreshFromDb(fetchError)
         }
     }
 
-    private suspend fun refreshFromDb() {
+    fun selectDate(date: LocalDate) {
+        val events = _uiState.value.monthlyEvents[date] ?: emptyList()
+        _uiState.value = _uiState.value.copy(
+            selectedDate = date,
+            selectedDateEvents = events,
+        )
+    }
+
+    fun changeMonth(yearMonth: YearMonth) {
+        viewModelScope.launch {
+            val monthlyEvents = buildMonthlyEvents(yearMonth)
+            val selectedDate = _uiState.value.selectedDate
+            _uiState.value = _uiState.value.copy(
+                currentMonth = yearMonth,
+                monthlyEvents = monthlyEvents,
+                selectedDateEvents = selectedDate?.let { monthlyEvents[it] } ?: emptyList(),
+            )
+        }
+    }
+
+    private suspend fun refreshFromDb(fetchError: String? = null) {
         val today = LocalDate.now(kst)
         val tomorrow = today.plusDays(1)
         val weekEnd = today.plusDays(8)
@@ -56,11 +84,27 @@ class CalendarViewModel(app: Application) : AndroidViewModel(app) {
         val tomorrowEvents = repository.getEventsForDateRange(dayMs(tomorrow), dayMs(tomorrow.plusDays(1)))
         val thisWeekEvents = repository.getEventsForDateRange(dayMs(today.plusDays(2)), dayMs(weekEnd))
 
+        val currentMonth = _uiState.value.currentMonth
+        val monthlyEvents = buildMonthlyEvents(currentMonth)
+        val selectedDate = _uiState.value.selectedDate
+
         _uiState.value = CalendarUiState(
             isLoading = false,
             todayEvents = todayEvents,
             tomorrowEvents = tomorrowEvents,
             thisWeekEvents = thisWeekEvents,
+            currentMonth = currentMonth,
+            monthlyEvents = monthlyEvents,
+            selectedDate = selectedDate,
+            selectedDateEvents = selectedDate?.let { monthlyEvents[it] } ?: emptyList(),
+            error = if (fetchError != null && todayEvents.isEmpty() && monthlyEvents.isEmpty()) fetchError else null,
         )
+    }
+
+    private suspend fun buildMonthlyEvents(yearMonth: YearMonth): Map<LocalDate, List<CalendarEvent>> {
+        fun toMs(date: LocalDate) = date.atStartOfDay(kst).toInstant().toEpochMilli()
+        val start = toMs(yearMonth.atDay(1))
+        val end = toMs(yearMonth.atEndOfMonth().plusDays(1))
+        return repository.getEventsForDateRange(start, end).groupBy { it.localDate }
     }
 }

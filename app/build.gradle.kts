@@ -14,6 +14,7 @@ val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
 val fredApiKey = localProperties.getProperty("FRED_API_KEY") ?: ""
 val newsApiKey = localProperties.getProperty("NEWS_API_KEY") ?: ""
 val fmpApiKey = localProperties.getProperty("FMP_API_KEY") ?: ""
+val finnhubApiKey = localProperties.getProperty("FINNHUB_API_KEY") ?: ""
 
 android {
     namespace = "com.example.investmentassistant"
@@ -34,6 +35,7 @@ android {
         buildConfigField("String", "FRED_API_KEY", "\"$fredApiKey\"")
         buildConfigField("String", "NEWS_API_KEY", "\"$newsApiKey\"")
         buildConfigField("String", "FMP_API_KEY", "\"$fmpApiKey\"")
+        buildConfigField("String", "FINNHUB_API_KEY", "\"$finnhubApiKey\"")
     }
 
     buildTypes {

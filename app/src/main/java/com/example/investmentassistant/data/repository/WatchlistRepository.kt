@@ -3,6 +3,7 @@ package com.example.investmentassistant.data.repository
 import com.example.investmentassistant.BuildConfig
 import com.example.investmentassistant.api.FinnhubNewsItem
 import com.example.investmentassistant.api.FinnhubQuote
+import com.example.investmentassistant.api.FinnhubSymbolResult
 import com.example.investmentassistant.api.MarketService
 import com.example.investmentassistant.data.WatchlistDao
 import com.example.investmentassistant.data.WatchlistEntity
@@ -43,6 +44,12 @@ class WatchlistRepository(private val dao: WatchlistDao) {
 
     fun getAll(): Flow<List<WatchlistItem>> = dao.getAll().map { list -> list.map { it.toModel() } }
 
+    suspend fun searchSymbols(query: String): List<FinnhubSymbolResult> = try {
+        service.searchSymbol(query, apiKey).result
+            .filter { it.type in setOf("Common Stock", "ETF", "ETP", "Fund", "ADR", "Index", "") }
+            .take(15)
+    } catch (_: Exception) { emptyList() }
+
     suspend fun addSymbol(symbol: String): Boolean {
         if (dao.countBySymbol(symbol.uppercase()) > 0) return false
         val upper = symbol.uppercase()
@@ -56,6 +63,22 @@ class WatchlistRepository(private val dao: WatchlistDao) {
             else -> "US"
         }
         dao.insert(WatchlistEntity(symbol = upper, displayName = displayName, exchange = exchange))
+        return true
+    }
+
+    suspend fun addFromSearch(result: FinnhubSymbolResult): Boolean {
+        val symbol = result.symbol.uppercase()
+        if (dao.countBySymbol(symbol) > 0) return false
+        val exchange = when {
+            symbol.endsWith(".KS") || symbol.endsWith(".KQ") -> "KR"
+            symbol.startsWith("^") -> "INDEX"
+            else -> "US"
+        }
+        dao.insert(WatchlistEntity(
+            symbol = symbol,
+            displayName = result.description.ifBlank { symbol },
+            exchange = exchange,
+        ))
         return true
     }
 

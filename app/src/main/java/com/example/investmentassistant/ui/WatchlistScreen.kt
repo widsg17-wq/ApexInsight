@@ -1,5 +1,6 @@
 package com.example.investmentassistant.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.investmentassistant.api.FinnhubSymbolResult
 import com.example.investmentassistant.model.WatchlistItem
 import com.example.investmentassistant.viewmodel.WatchlistViewModel
 import java.time.Instant
@@ -41,12 +45,10 @@ fun WatchlistScreen(
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var inputSymbol by remember { mutableStateOf("") }
     var showAddDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.addSuccess) {
         if (uiState.addSuccess) {
-            inputSymbol = ""
             showAddDialog = false
             viewModel.clearAddState()
         }
@@ -72,7 +74,7 @@ fun WatchlistScreen(
                         Text("모니터링할 종목이 없어요", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "+ 버튼으로 티커를 추가하세요\n예: AAPL, NVDA, 005930.KS, ^GSPC",
+                            "+ 버튼으로 종목을 검색해 추가하세요",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -100,29 +102,109 @@ fun WatchlistScreen(
     }
 
     if (showAddDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false; viewModel.clearAddState() },
-            title = { Text("종목 추가") },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = inputSymbol,
-                        onValueChange = { inputSymbol = it.uppercase() },
-                        label = { Text("티커 입력") },
-                        placeholder = { Text("예: AAPL, 005930.KS, ^GSPC") },
-                        singleLine = true,
-                        isError = uiState.addError != null,
-                        supportingText = uiState.addError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.addSymbol(inputSymbol) }) { Text("추가") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false; viewModel.clearAddState() }) { Text("취소") }
+        SearchAddDialog(
+            viewModel = viewModel,
+            onDismiss = {
+                showAddDialog = false
+                viewModel.clearAddState()
             },
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchAddDialog(
+    viewModel: WatchlistViewModel,
+    onDismiss: () -> Unit,
+) {
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+    val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("종목 검색") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.onSearchQueryChange(it) },
+                    label = { Text("종목명 또는 티커") },
+                    placeholder = { Text("예: SK Hynix, Apple, NVDA, 005930") },
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (isSearching) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                if (uiState.addError != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(uiState.addError!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                }
+
+                if (searchQuery.length < 2 && searchResults.isEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "2글자 이상 입력하면 자동으로 검색됩니다\n한국 주식: 000660.KS / 코스닥: .KQ\n지수: ^GSPC (S&P500), ^KS11 (코스피)",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp,
+                    )
+                }
+
+                if (searchResults.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider()
+                    LazyColumn(modifier = Modifier.heightIn(max = 280.dp)) {
+                        items(searchResults) { result ->
+                            SearchResultItem(
+                                result = result,
+                                onClick = { viewModel.addFromSearch(result) },
+                            )
+                            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("닫기") }
+        },
+    )
+}
+
+@Composable
+private fun SearchResultItem(result: FinnhubSymbolResult, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(result.displaySymbol.ifBlank { result.symbol }, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(result.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+        if (result.type.isNotBlank()) {
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = MaterialTheme.shapes.small,
+            ) {
+                Text(
+                    result.type,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+        }
     }
 }
 

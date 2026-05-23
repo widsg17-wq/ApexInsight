@@ -232,7 +232,11 @@ private fun WatchlistCard(item: WatchlistItem, onDelete: () -> Unit) {
                         )
                     }
                 } else {
-                    Text("로딩 중...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (item.lastCheckedAt > 0) "시세 없음" else "새로고침 필요",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, "삭제", tint = MaterialTheme.colorScheme.onSurfaceVariant)

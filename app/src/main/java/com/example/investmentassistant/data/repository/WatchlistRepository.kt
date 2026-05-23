@@ -33,9 +33,17 @@ class WatchlistRepository(private val dao: WatchlistDao) {
     private val apiKey get() = BuildConfig.FINNHUB_API_KEY
     private val dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
+    private val httpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
+
     private val service: MarketService by lazy {
         Retrofit.Builder()
             .baseUrl("https://finnhub.io/api/v1/")
+            .client(httpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(MarketService::class.java)
@@ -131,31 +139,48 @@ class WatchlistRepository(private val dao: WatchlistDao) {
 
         for (entity in items) {
             try {
-                val quote = service.getQuote(entity.symbol, apiKey)
-                if (quote.c == 0.0) continue
+                val isKorean = entity.symbol.endsWith(".KS") || entity.symbol.endsWith(".KQ")
+                val (price, changePercent) = if (isKorean) {
+                    fetchYahooQuote(entity.symbol)
+                } else {
+                    val q = service.getQuote(entity.symbol, apiKey)
+                    Pair(q.c, q.dp)
+                }
 
-                val changePercent = quote.dp
+                if (price == 0.0) {
+                    dao.update(entity.copy(lastCheckedAt = now))
+                    continue
+                }
+
                 val isAlert = Math.abs(changePercent) >= entity.threshold
-                    && now - entity.lastAlertAt > 60 * 60 * 1000 // 1시간 쿨다운
+                    && now - entity.lastAlertAt > 60 * 60 * 1000
 
+                val finnhubQuote = FinnhubQuote(c = price, dp = changePercent)
                 var alertMessage: String? = entity.lastAlertMessage
                 if (isAlert) {
                     val news = fetchRecentNews(entity.symbol)
-                    alertMessage = analyzeAlert(entity.symbol, entity.displayName, quote, news)
-                    alerts += WatchlistAlert(entity.toModel(), quote, alertMessage)
+                    alertMessage = analyzeAlert(entity.symbol, entity.displayName, finnhubQuote, news)
+                    alerts += WatchlistAlert(entity.toModel(), finnhubQuote, alertMessage)
                 }
 
                 dao.update(entity.copy(
-                    lastPrice = quote.c,
+                    lastPrice = price,
                     lastChangePercent = changePercent,
                     lastCheckedAt = now,
                     lastAlertAt = if (isAlert) now else entity.lastAlertAt,
                     lastAlertMessage = alertMessage,
                 ))
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+                dao.update(entity.copy(lastCheckedAt = now))
+            }
         }
         return alerts
     }
+
+    private suspend fun fetchYahooQuote(symbol: String): Pair<Double, Double> = try {
+        val result = yahooService.getQuote(symbol).quoteResponse.result.firstOrNull()
+        Pair(result?.regularMarketPrice ?: 0.0, result?.regularMarketChangePercent ?: 0.0)
+    } catch (_: Exception) { Pair(0.0, 0.0) }
 
     private suspend fun fetchRecentNews(symbol: String): List<FinnhubNewsItem> = try {
         val today = ZonedDateTime.now().format(dateFmt)

@@ -52,8 +52,8 @@ fun WatchlistScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize().padding(bottomPadding)) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
                 title = { Text("종목 모니터링") },
                 actions = {
@@ -66,43 +66,36 @@ fun WatchlistScreen(
                     }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, "종목 추가")
-            }
-        },
-    ) { innerPadding ->
-        if (items.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("모니터링할 종목이 없어요", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "+ 버튼으로 티커를 추가하세요\n예: AAPL, NVDA, 005930.KS, ^GSPC",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            if (items.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("모니터링할 종목이 없어요", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "+ 버튼으로 티커를 추가하세요\n예: AAPL, NVDA, 005930.KS, ^GSPC",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(items, key = { it.id }) { item ->
+                        WatchlistCard(item = item, onDelete = { viewModel.removeItem(item.id) })
+                    }
                 }
             }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(
-                    start = 16.dp, end = 16.dp,
-                    top = innerPadding.calculateTopPadding() + 8.dp,
-                    bottom = 80.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(items, key = { it.id }) { item ->
-                    WatchlistCard(item = item, onDelete = { viewModel.removeItem(item.id) })
-                }
-            }
+        }
+        FloatingActionButton(
+            onClick = { showAddDialog = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 16.dp),
+        ) {
+            Icon(Icons.Default.Add, "종목 추가")
         }
     }
 

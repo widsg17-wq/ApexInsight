@@ -5,12 +5,14 @@ import com.example.investmentassistant.api.FinnhubNewsItem
 import com.example.investmentassistant.api.FinnhubQuote
 import com.example.investmentassistant.api.FinnhubSymbolResult
 import com.example.investmentassistant.api.MarketService
+import com.example.investmentassistant.api.YahooFinanceService
 import com.example.investmentassistant.data.WatchlistDao
 import com.example.investmentassistant.data.WatchlistEntity
 import com.example.investmentassistant.model.WatchlistItem
 import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.time.DayOfWeek
@@ -38,6 +40,24 @@ class WatchlistRepository(private val dao: WatchlistDao) {
             .create(MarketService::class.java)
     }
 
+    private val yahooService: YahooFinanceService by lazy {
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                chain.proceed(
+                    chain.request().newBuilder()
+                        .header("User-Agent", "Mozilla/5.0")
+                        .build()
+                )
+            }
+            .build()
+        Retrofit.Builder()
+            .baseUrl("https://query1.finance.yahoo.com/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(YahooFinanceService::class.java)
+    }
+
     private val gemini by lazy {
         GenerativeModel(modelName = "gemini-2.5-flash", apiKey = BuildConfig.GEMINI_API_KEY)
     }
@@ -45,9 +65,24 @@ class WatchlistRepository(private val dao: WatchlistDao) {
     fun getAll(): Flow<List<WatchlistItem>> = dao.getAll().map { list -> list.map { it.toModel() } }
 
     suspend fun searchSymbols(query: String): List<FinnhubSymbolResult> = try {
-        service.searchSymbol(query, apiKey).result
-            .filter { it.type in setOf("Common Stock", "ETF", "ETP", "Fund", "ADR", "Index", "") }
+        yahooService.searchSymbols(query).quotes
+            .filter { it.quoteType in setOf("EQUITY", "ETF", "INDEX", "MUTUALFUND", "FUND") }
             .take(15)
+            .map { quote ->
+                val typeLabel = when (quote.quoteType) {
+                    "EQUITY" -> "주식"
+                    "ETF" -> "ETF"
+                    "INDEX" -> "지수"
+                    "MUTUALFUND", "FUND" -> "펀드"
+                    else -> quote.quoteType
+                }
+                FinnhubSymbolResult(
+                    symbol = quote.symbol,
+                    displaySymbol = quote.symbol,
+                    description = quote.longname.ifBlank { quote.shortname },
+                    type = typeLabel,
+                )
+            }
     } catch (_: Exception) { emptyList() }
 
     suspend fun addSymbol(symbol: String): Boolean {

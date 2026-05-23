@@ -27,4 +27,7 @@ interface CalendarEventDao {
 
     @Query("DELETE FROM calendar_events WHERE type = 'ECONOMIC' AND country NOT IN (:countries)")
     suspend fun deleteEconomicEventsFromNonMajorCountries(countries: List<String>)
+
+    @Query("DELETE FROM calendar_events WHERE type = 'ECONOMIC'")
+    suspend fun deleteAllEconomicEvents()
 }

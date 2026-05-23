@@ -44,12 +44,14 @@ class CalendarRepository(private val dao: CalendarEventDao) {
 
         try {
             val response = service.getEconomicCalendar(apiKey)
-            val filtered = (response.economicCalendar ?: emptyList())
+            val mapped = (response.economicCalendar ?: emptyList())
                 .filter { isHighImpact(it) && it.country.uppercase() in MAJOR_COUNTRIES }
-            filtered.forEach { e ->
-                Log.d("CalendarRepo", "[${e.country}] ${e.event} | prev=${e.prev} est=${e.estimate} actual=${e.actual} unit=${e.unit} time=${e.time}")
-            }
-            events += filtered.mapNotNull { it.toCalendarEvent() }
+                .mapNotNull { it.toCalendarEvent() }
+            // 같은 국가·날짜·제목의 중복 이벤트는 중요도 높은 것 하나만 유지
+            events += mapped
+                .groupBy { Triple(it.country, it.localDate, it.title) }
+                .values
+                .map { group -> group.maxByOrNull { it.importance.ordinal.inv() }!! }
         } catch (e: Exception) {
             errors += "경제 캘린더: ${e.message}"
         }
@@ -65,8 +67,10 @@ class CalendarRepository(private val dao: CalendarEventDao) {
 
         if (errors.size == 2) throw RuntimeException(errors.joinToString("\n"))
 
+        // 경제 이벤트는 매번 완전히 교체해서 오염된 캐시가 남지 않도록 함
+        val notifiedIds = dao.getNotifiedEventIds().toHashSet()
+        dao.deleteAllEconomicEvents()
         if (events.isNotEmpty()) {
-            val notifiedIds = dao.getNotifiedEventIds().toHashSet()
             dao.upsertAll(events.map { event ->
                 event.toEntity().let {
                     if (it.id in notifiedIds) it.copy(isNotified = 1) else it
@@ -76,7 +80,6 @@ class CalendarRepository(private val dao: CalendarEventDao) {
 
         val cutoff = today.minusDays(14).atStartOfDay(kst).toInstant().toEpochMilli()
         dao.deleteOldEvents(cutoff)
-        dao.deleteEconomicEventsFromNonMajorCountries(MAJOR_COUNTRIES.toList())
     }
 
     suspend fun getEventsForDateRange(fromMs: Long, toMs: Long): List<CalendarEvent> =
@@ -100,13 +103,14 @@ class CalendarRepository(private val dao: CalendarEventDao) {
             "medium" -> EventImportance.MEDIUM
             else -> EventImportance.LOW
         }
-        val normalizedUnit = when {
+        // 퍼센트 지표는 Finnhub이 $, USD 등 잘못된 단위를 내려줘도 %로 강제
+        val effectiveUnit = if (PERCENTAGE_KEYWORDS.any { event.lowercase().contains(it) }) {
+            "%"
+        } else when {
             unit.isNullOrBlank() -> null
             unit.trim().lowercase() in setOf("percent", "pct", "%") -> "%"
             else -> unit.trim()
         }
-        val effectiveUnit = normalizedUnit
-            ?: if (PERCENTAGE_KEYWORDS.any { event.lowercase().contains(it) }) "%" else null
         return CalendarEvent(
             id = "eco_${time}_${event.replace(" ", "_")}",
             type = EventType.ECONOMIC,

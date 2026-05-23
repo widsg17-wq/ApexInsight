@@ -95,7 +95,12 @@ class CalendarRepository(private val dao: CalendarEventDao) {
             "medium" -> EventImportance.MEDIUM
             else -> EventImportance.LOW
         }
-        val effectiveUnit = unit?.takeIf { it.isNotBlank() }
+        val normalizedUnit = when {
+            unit.isNullOrBlank() -> null
+            unit.trim().lowercase() in setOf("percent", "pct", "%") -> "%"
+            else -> unit.trim()
+        }
+        val effectiveUnit = normalizedUnit
             ?: if (PERCENTAGE_KEYWORDS.any { event.lowercase().contains(it) }) "%" else null
         return CalendarEvent(
             id = "eco_${time}_${event.replace(" ", "_")}",

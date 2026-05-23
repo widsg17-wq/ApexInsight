@@ -303,10 +303,11 @@ private fun EventDetailBottomSheet(
                 EventType.ECONOMIC -> {
                     if (event.previous != null || event.forecast != null || event.actual != null) {
                         HorizontalDivider()
+                        val delta = computeDelta(event.previous, event.actual)
                         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                             event.previous?.let { ValueChip("이전", it) }
                             event.forecast?.let { ValueChip("예상", it) }
-                            event.actual?.let { ValueChip("실제", it, highlight = true) }
+                            event.actual?.let { ValueChip("실제", it, highlight = true, delta = delta) }
                         }
                     }
                 }
@@ -517,10 +518,11 @@ private fun CalendarEventCard(
 
 @Composable
 private fun EconomicValues(event: CalendarEvent) {
+    val delta = computeDelta(event.previous, event.actual)
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         event.previous?.let { ValueChip("이전", it) }
         event.forecast?.let { ValueChip("예상", it) }
-        event.actual?.let { ValueChip("실제", it, highlight = true) }
+        event.actual?.let { ValueChip("실제", it, highlight = true, delta = delta) }
     }
 }
 
@@ -545,7 +547,7 @@ private fun EarningsValues(event: CalendarEvent) {
 }
 
 @Composable
-private fun ValueChip(label: String, value: String, highlight: Boolean = false) {
+private fun ValueChip(label: String, value: String, highlight: Boolean = false, delta: String? = null) {
     Column {
         Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
@@ -554,7 +556,30 @@ private fun ValueChip(label: String, value: String, highlight: Boolean = false) 
             fontWeight = if (highlight) FontWeight.Bold else FontWeight.Normal,
             color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
         )
+        if (delta != null) {
+            Text(
+                delta,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
+}
+
+private fun computeDelta(previous: String?, actual: String?): String? {
+    if (previous == null || actual == null) return null
+    val prevVal = previous.replace(Regex("[^0-9.\\-]"), "").toDoubleOrNull() ?: return null
+    val actVal = actual.replace(Regex("[^0-9.\\-]"), "").toDoubleOrNull() ?: return null
+    val diff = actVal - prevVal
+    if (diff == 0.0) return null
+    val unit = if (actual.contains("%")) "%p" else ""
+    val absDiff = kotlin.math.abs(diff)
+    val formatted = if (absDiff == kotlin.math.floor(absDiff) && !absDiff.isInfinite()) {
+        absDiff.toLong().toString()
+    } else {
+        "%.2f".format(absDiff).trimEnd('0').trimEnd('.')
+    }
+    return "${if (diff > 0) "▲" else "▼"}$formatted$unit"
 }
 
 @Composable

@@ -178,8 +178,11 @@ class WatchlistRepository(private val dao: WatchlistDao) {
     }
 
     private suspend fun fetchYahooQuote(symbol: String): Pair<Double, Double> = try {
-        val result = yahooService.getQuote(symbol).quoteResponse.result.firstOrNull()
-        Pair(result?.regularMarketPrice ?: 0.0, result?.regularMarketChangePercent ?: 0.0)
+        val meta = yahooService.getChart(symbol).chart.result?.firstOrNull()?.meta
+        val price = meta?.regularMarketPrice ?: 0.0
+        val prevClose = meta?.chartPreviousClose ?: 0.0
+        val changePercent = if (prevClose != 0.0) (price - prevClose) / prevClose * 100.0 else 0.0
+        Pair(price, changePercent)
     } catch (_: Exception) { Pair(0.0, 0.0) }
 
     private suspend fun fetchRecentNews(symbol: String): List<FinnhubNewsItem> = try {

@@ -4,6 +4,7 @@ import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
 
+
 data class YahooSearchQuote(
     val symbol: String = "",
     val shortname: String = "",
@@ -16,20 +17,21 @@ data class YahooSearchResponse(
     val quotes: List<YahooSearchQuote> = emptyList(),
 )
 
-data class YahooQuoteResult(
-    val symbol: String = "",
+data class YahooChartMeta(
     val regularMarketPrice: Double = 0.0,
-    val regularMarketChangePercent: Double = 0.0,
-    val regularMarketPreviousClose: Double = 0.0,
-    val regularMarketOpen: Double = 0.0,
+    val chartPreviousClose: Double = 0.0,
 )
 
-data class YahooQuoteResponse(
-    val result: List<YahooQuoteResult> = emptyList(),
+data class YahooChartResult(
+    val meta: YahooChartMeta = YahooChartMeta(),
 )
 
-data class YahooQuoteWrapper(
-    val quoteResponse: YahooQuoteResponse = YahooQuoteResponse(),
+data class YahooChartData(
+    val result: List<YahooChartResult>? = null,
+)
+
+data class YahooChartResponse(
+    val chart: YahooChartData = YahooChartData(),
 )
 
 interface YahooFinanceService {
@@ -40,8 +42,10 @@ interface YahooFinanceService {
         @Query("newsCount") newsCount: Int = 0,
     ): YahooSearchResponse
 
-    @GET("v7/finance/quote")
-    suspend fun getQuote(
-        @Query("symbols") symbols: String,
-    ): YahooQuoteWrapper
+    @GET("v8/finance/chart/{symbol}")
+    suspend fun getChart(
+        @Path("symbol") symbol: String,
+        @Query("interval") interval: String = "1d",
+        @Query("range") range: String = "1d",
+    ): YahooChartResponse
 }

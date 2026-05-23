@@ -6,12 +6,14 @@ import android.app.NotificationManager
 import com.example.investmentassistant.worker.AutoReportWorker
 import com.example.investmentassistant.worker.CalendarNotificationWorker
 import com.example.investmentassistant.worker.IndicatorAlertWorker
+import com.example.investmentassistant.worker.MarketMonitorWorker
 
 class InvestmentApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        MarketMonitorWorker.schedule(this)
     }
 
     private fun createNotificationChannels() {
@@ -42,6 +44,11 @@ class InvestmentApp : Application() {
                 "투자 포인트 알림",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply { description = "AI 투자 포인트 감지 알림" },
+            NotificationChannel(
+                MarketMonitorWorker.CHANNEL_ID,
+                "종목 급변 알림",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply { description = "모니터링 종목 급등·급락 감지 알림" },
         ).forEach { manager.createNotificationChannel(it) }
     }
 }

@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [SavedReport::class, TokenRecord::class, WatchedKeyword::class, IndicatorSnapshot::class, CalendarEventEntity::class],
-    version = 5,
+    entities = [SavedReport::class, TokenRecord::class, WatchedKeyword::class, IndicatorSnapshot::class, CalendarEventEntity::class, WatchlistEntity::class],
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -19,6 +19,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun watchedKeywordDao(): WatchedKeywordDao
     abstract fun indicatorSnapshotDao(): IndicatorSnapshotDao
     abstract fun calendarEventDao(): CalendarEventDao
+    abstract fun watchlistDao(): WatchlistDao
 
     companion object {
         @Volatile
@@ -80,6 +81,27 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS watchlist (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        symbol TEXT NOT NULL,
+                        displayName TEXT NOT NULL,
+                        exchange TEXT NOT NULL,
+                        threshold REAL NOT NULL DEFAULT 5.0,
+                        lastPrice REAL,
+                        lastChangePercent REAL,
+                        lastCheckedAt INTEGER NOT NULL DEFAULT 0,
+                        lastAlertAt INTEGER NOT NULL DEFAULT 0,
+                        lastAlertMessage TEXT
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -87,7 +109,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "investment_assistant_db",
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance

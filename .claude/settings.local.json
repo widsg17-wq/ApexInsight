@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(Get-ChildItem -Path \"D:\\\\Projects\\\\ApexInsight\" -Force)",
+      "Bash(Select-Object Name, Mode)",
+      "Bash(git show *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git restore *)",
+      "Bash(./gradlew clean *)",
+      "Bash(adb devices *)",
+      "PowerShell(adb devices *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell($adb = \"C:\\\\Users\\\\widsg\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb logcat -d -t 200 --pid=$\\(& $adb shell pidof com.example.investmentassistant 2>$null\\) 2>$null | Select-String -Pattern \"FATAL|AndroidRuntime|crash|Exception|Error\" | Select-Object -Last 50)",
+      "PowerShell($adb = \"C:\\\\Users\\\\widsg\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb logcat -d -t 300 2>$null | Select-String -Pattern \"FATAL|AndroidRuntime|investmentassistant\" | Select-Object -Last 60)",
+      "PowerShell($adb = \"C:\\\\Users\\\\widsg\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb logcat -d -t 500 2>$null | Where-Object { $_ -match \"22125\" } | Select-Object -Last 60)",
+      "PowerShell($adb = \"C:\\\\Users\\\\widsg\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb logcat -d -t 500 2>$null | Where-Object { $_ -match \"22125\" } | Select-Object -First 80)",
+      "Bash(git push *)",
+      "mcp__github__search_repositories",
+      "mcp__github__create_repository",
+      "Bash(./gradlew :app:compileDebugKotlin)",
+      "Bash(./gradlew :app:assembleDebug)",
+      "WebFetch(domain:finnhub.io)",
+      "Bash(./gradlew assembleDebug)",
+      "Bash(/mnt/c/Users/widsg/AppData/Local/Android/Sdk/platform-tools/adb devices *)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" devices)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" install -r \"D:\\\\Projects\\\\ApexInsight\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\\\\app-debug.apk\")",
+      "PowerShell(echo \"362562\" | & \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" pair 192.168.0.26:45537)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" pair 192.168.0.26:45537 362562)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" pair 192.168.0.26:46755 920244)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" version)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" -s R3CX801W2ME install -r \"D:\\\\Projects\\\\ApexInsight\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\\\\app-debug.apk\")"
+    ]
+  }
+}

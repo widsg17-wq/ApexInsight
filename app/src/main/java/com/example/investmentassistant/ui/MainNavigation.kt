@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -20,6 +21,7 @@ private enum class TopDest(val label: String, val icon: ImageVector, val route: 
     DASHBOARD("대시보드", Icons.Default.Home, "dashboard"),
     NEWS("뉴스 검색", Icons.Default.Search, "news"),
     CALENDAR("캘린더", Icons.Default.CalendarMonth, "calendar"),
+    WATCHLIST("모니터링", Icons.Default.ShowChart, "watchlist"),
     ARCHIVE("보관함", Icons.Default.Bookmark, "archive"),
     SUBSCRIBE("구독", Icons.Default.Notifications, "subscribe"),
 }
@@ -43,6 +45,9 @@ fun MainAppScreen() {
             }
             composable(TopDest.CALENDAR.route) {
                 CalendarScreen(bottomPadding = padding)
+            }
+            composable(TopDest.WATCHLIST.route) {
+                WatchlistScreen(bottomPadding = padding)
             }
             composable(TopDest.ARCHIVE.route) {
                 SavedReportsScreen(bottomPadding = padding)

@@ -572,14 +572,25 @@ private fun computeDelta(previous: String?, actual: String?): String? {
     val actVal = actual.replace(Regex("[^0-9.\\-]"), "").toDoubleOrNull() ?: return null
     val diff = actVal - prevVal
     if (diff == 0.0) return null
-    val unit = if (actual.contains("%")) "%p" else ""
-    val absDiff = kotlin.math.abs(diff)
-    val formatted = if (absDiff == kotlin.math.floor(absDiff) && !absDiff.isInfinite()) {
-        absDiff.toLong().toString()
+    val arrow = if (diff > 0) "▲" else "▼"
+    return if (actual.contains("%")) {
+        val absDiff = kotlin.math.abs(diff)
+        val formatted = if (absDiff == kotlin.math.floor(absDiff) && !absDiff.isInfinite()) {
+            absDiff.toLong().toString()
+        } else {
+            "%.2f".format(absDiff).trimEnd('0').trimEnd('.')
+        }
+        "$arrow${formatted}%p"
     } else {
-        "%.2f".format(absDiff).trimEnd('0').trimEnd('.')
+        if (prevVal == 0.0) return null
+        val relChange = kotlin.math.abs(diff / prevVal * 100)
+        val formatted = if (relChange == kotlin.math.floor(relChange) && !relChange.isInfinite()) {
+            relChange.toLong().toString()
+        } else {
+            "%.1f".format(relChange)
+        }
+        "$arrow${formatted}%"
     }
-    return "${if (diff > 0) "▲" else "▼"}$formatted$unit"
 }
 
 @Composable

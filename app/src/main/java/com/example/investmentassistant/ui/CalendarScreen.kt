@@ -304,10 +304,16 @@ private fun EventDetailBottomSheet(
                     if (event.previous != null || event.forecast != null || event.actual != null) {
                         HorizontalDivider()
                         val delta = computeDelta(event.previous, event.actual)
+                        val periodLabel = when {
+                            "(연간)" in event.title -> "전년 대비"
+                            "(월간)" in event.title -> "전월 대비"
+                            "(분기)" in event.title -> "전분기 대비"
+                            else -> "실제"
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                             event.previous?.let { ValueChip("이전", it) }
                             event.forecast?.let { ValueChip("예상", it) }
-                            event.actual?.let { ValueChip("실제", it, highlight = true, delta = delta) }
+                            event.actual?.let { ValueChip(periodLabel, it, highlight = true, delta = delta) }
                         }
                     }
                 }
@@ -519,10 +525,16 @@ private fun CalendarEventCard(
 @Composable
 private fun EconomicValues(event: CalendarEvent) {
     val delta = computeDelta(event.previous, event.actual)
+    val periodLabel = when {
+        "(연간)" in event.title -> "전년 대비"
+        "(월간)" in event.title -> "전월 대비"
+        "(분기)" in event.title -> "전분기 대비"
+        else -> "실제"
+    }
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         event.previous?.let { ValueChip("이전", it) }
         event.forecast?.let { ValueChip("예상", it) }
-        event.actual?.let { ValueChip("실제", it, highlight = true, delta = delta) }
+        event.actual?.let { ValueChip(periodLabel, it, highlight = true, delta = delta) }
     }
 }
 
@@ -580,7 +592,7 @@ private fun computeDelta(previous: String?, actual: String?): String? {
         } else {
             "%.2f".format(absDiff).trimEnd('0').trimEnd('.')
         }
-        "$arrow${formatted}%p"
+        "이전 대비 $arrow${formatted}%p"
     } else {
         if (prevVal == 0.0) return null
         val relChange = kotlin.math.abs(diff / prevVal * 100)
@@ -589,7 +601,7 @@ private fun computeDelta(previous: String?, actual: String?): String? {
         } else {
             "%.1f".format(relChange)
         }
-        "$arrow${formatted}%"
+        "이전 대비 $arrow${formatted}%"
     }
 }
 

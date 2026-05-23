@@ -1,0 +1,148 @@
+package com.example.investmentassistant.data
+
+import com.example.investmentassistant.api.FinnhubSymbolResult
+
+object KoreanStockDatabase {
+
+    private data class Stock(val symbol: String, val name: String, val type: String = "주식")
+
+    private val stocks = listOf(
+        // KOSPI 대형주
+        Stock("005930.KS", "삼성전자"),
+        Stock("000660.KS", "SK하이닉스"),
+        Stock("373220.KS", "LG에너지솔루션"),
+        Stock("207940.KS", "삼성바이오로직스"),
+        Stock("005380.KS", "현대차"),
+        Stock("000270.KS", "기아"),
+        Stock("005490.KS", "POSCO홀딩스"),
+        Stock("068270.KS", "셀트리온"),
+        Stock("051910.KS", "LG화학"),
+        Stock("005935.KS", "삼성전자우"),
+        Stock("035420.KS", "NAVER"),
+        Stock("035720.KS", "카카오"),
+        Stock("006400.KS", "삼성SDI"),
+        Stock("096770.KS", "SK이노베이션"),
+        Stock("012330.KS", "현대모비스"),
+        Stock("066570.KS", "LG전자"),
+        Stock("017670.KS", "SK텔레콤"),
+        Stock("030200.KS", "KT"),
+        Stock("055550.KS", "신한지주"),
+        Stock("105560.KS", "KB금융"),
+        Stock("086790.KS", "하나금융지주"),
+        Stock("316140.KS", "우리금융지주"),
+        Stock("032830.KS", "삼성생명"),
+        Stock("000810.KS", "삼성화재"),
+        Stock("003550.KS", "LG"),
+        Stock("034730.KS", "SK"),
+        Stock("011170.KS", "롯데케미칼"),
+        Stock("010130.KS", "고려아연"),
+        Stock("034020.KS", "두산에너빌리티"),
+        Stock("012450.KS", "한화에어로스페이스"),
+        Stock("259960.KS", "크래프톤"),
+        Stock("036570.KS", "엔씨소프트"),
+        Stock("323410.KS", "카카오뱅크"),
+        Stock("377300.KS", "카카오페이"),
+        Stock("329180.KS", "HD현대중공업"),
+        Stock("015760.KS", "한국전력"),
+        Stock("003670.KS", "포스코퓨처엠"),
+        Stock("128940.KS", "한미약품"),
+        Stock("011200.KS", "HMM"),
+        Stock("086280.KS", "현대글로비스"),
+        Stock("010950.KS", "S-Oil"),
+        Stock("090430.KS", "아모레퍼시픽"),
+        Stock("078930.KS", "GS"),
+        Stock("009830.KS", "한화솔루션"),
+        Stock("028260.KS", "삼성물산"),
+        Stock("000720.KS", "현대건설"),
+        Stock("352820.KS", "하이브"),
+        Stock("018260.KS", "삼성에스디에스"),
+        Stock("009150.KS", "삼성전기"),
+        Stock("016360.KS", "삼성증권"),
+        Stock("006800.KS", "미래에셋증권"),
+        Stock("005940.KS", "NH투자증권"),
+        Stock("003490.KS", "대한항공"),
+        Stock("020560.KS", "아시아나항공"),
+        Stock("000120.KS", "CJ대한통운"),
+        Stock("097950.KS", "CJ제일제당"),
+        Stock("042660.KS", "한화오션"),
+        Stock("241560.KS", "두산밥캣"),
+        Stock("010140.KS", "삼성중공업"),
+        Stock("071050.KS", "한국금융지주"),
+        Stock("030000.KS", "제일기획"),
+        Stock("009240.KS", "한샘"),
+        Stock("271560.KS", "오리온"),
+        Stock("280360.KS", "롯데웰푸드"),
+        Stock("005180.KS", "빙그레"),
+        Stock("006360.KS", "GS건설"),
+        Stock("047050.KS", "포스코인터내셔널"),
+        Stock("161390.KS", "한국타이어앤테크놀로지"),
+        Stock("000100.KS", "유한양행"),
+        Stock("002790.KS", "아모레G"),
+        Stock("089590.KS", "제주항공"),
+        Stock("272450.KS", "진에어"),
+        Stock("021240.KS", "코웨이"),
+        Stock("036460.KS", "한국가스공사"),
+        Stock("032640.KS", "LG유플러스"),
+        Stock("000880.KS", "한화"),
+        Stock("004020.KS", "현대제철"),
+        Stock("011780.KS", "금호석유"),
+        Stock("024110.KS", "기업은행"),
+        Stock("138930.KS", "BNK금융지주"),
+        Stock("139130.KS", "DGB금융지주"),
+        Stock("175330.KS", "JB금융지주"),
+
+        // KOSDAQ 주요 종목
+        Stock("247540.KQ", "에코프로비엠"),
+        Stock("086520.KQ", "에코프로"),
+        Stock("091990.KQ", "셀트리온헬스케어"),
+        Stock("068760.KQ", "셀트리온제약"),
+        Stock("196170.KQ", "알테오젠"),
+        Stock("263750.KQ", "펄어비스"),
+        Stock("066970.KQ", "엘앤에프"),
+        Stock("012510.KQ", "더존비즈온"),
+        Stock("293490.KQ", "카카오게임즈"),
+        Stock("039490.KQ", "키움증권"),
+        Stock("035900.KQ", "JYP엔터"),
+        Stock("041510.KQ", "에스엠"),
+        Stock("122870.KQ", "와이지엔터테인먼트"),
+        Stock("112040.KQ", "위메이드"),
+        Stock("036800.KQ", "나스미디어"),
+        Stock("214150.KQ", "클래시스"),
+        Stock("145020.KQ", "휴젤"),
+        Stock("236340.KQ", "메가스터디교육"),
+        Stock("357780.KQ", "솔브레인"),
+        Stock("058970.KQ", "엠씨넥스"),
+
+        // 주요 ETF
+        Stock("069500.KS", "KODEX 200", "ETF"),
+        Stock("122630.KS", "KODEX 레버리지", "ETF"),
+        Stock("114800.KS", "KODEX 인버스", "ETF"),
+        Stock("102110.KS", "TIGER 200", "ETF"),
+        Stock("229200.KS", "KODEX KOSDAQ150", "ETF"),
+        Stock("133690.KS", "TIGER NASDAQ100", "ETF"),
+        Stock("379800.KS", "KODEX 미국S&P500TR", "ETF"),
+        Stock("251340.KS", "KODEX 코스닥150레버리지", "ETF"),
+        Stock("091160.KS", "KODEX 반도체", "ETF"),
+        Stock("157490.KS", "TIGER 차이나CSI300", "ETF"),
+        Stock("278540.KS", "KODEX 2차전지산업", "ETF"),
+        Stock("305720.KS", "KODEX 2차전지", "ETF"),
+        Stock("371460.KS", "TIGER 차이나전기차", "ETF"),
+        Stock("364980.KS", "TIGER 미국나스닥100레버리지", "ETF"),
+    )
+
+    fun search(query: String): List<FinnhubSymbolResult> =
+        stocks
+            .filter { stock ->
+                stock.name.contains(query, ignoreCase = true) ||
+                stock.symbol.contains(query, ignoreCase = true)
+            }
+            .take(15)
+            .map { stock ->
+                FinnhubSymbolResult(
+                    symbol = stock.symbol,
+                    displaySymbol = stock.symbol,
+                    description = stock.name,
+                    type = stock.type,
+                )
+            }
+}

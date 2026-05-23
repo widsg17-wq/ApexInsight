@@ -6,6 +6,7 @@ import com.example.investmentassistant.api.FinnhubQuote
 import com.example.investmentassistant.api.FinnhubSymbolResult
 import com.example.investmentassistant.api.MarketService
 import com.example.investmentassistant.api.YahooFinanceService
+import com.example.investmentassistant.data.KoreanStockDatabase
 import com.example.investmentassistant.data.WatchlistDao
 import com.example.investmentassistant.data.WatchlistEntity
 import com.example.investmentassistant.model.WatchlistItem
@@ -64,26 +65,30 @@ class WatchlistRepository(private val dao: WatchlistDao) {
 
     fun getAll(): Flow<List<WatchlistItem>> = dao.getAll().map { list -> list.map { it.toModel() } }
 
-    suspend fun searchSymbols(query: String): List<FinnhubSymbolResult> = try {
-        yahooService.searchSymbols(query).quotes
-            .filter { it.quoteType in setOf("EQUITY", "ETF", "INDEX", "MUTUALFUND", "FUND") }
-            .take(15)
-            .map { quote ->
-                val typeLabel = when (quote.quoteType) {
-                    "EQUITY" -> "주식"
-                    "ETF" -> "ETF"
-                    "INDEX" -> "지수"
-                    "MUTUALFUND", "FUND" -> "펀드"
-                    else -> quote.quoteType
+    suspend fun searchSymbols(query: String): List<FinnhubSymbolResult> {
+        val hasKorean = query.any { it.code in 0xAC00..0xD7A3 || it.code in 0x1100..0x11FF }
+        if (hasKorean) return KoreanStockDatabase.search(query)
+        return try {
+            yahooService.searchSymbols(query).quotes
+                .filter { it.quoteType in setOf("EQUITY", "ETF", "INDEX", "MUTUALFUND", "FUND") }
+                .take(15)
+                .map { quote ->
+                    val typeLabel = when (quote.quoteType) {
+                        "EQUITY" -> "주식"
+                        "ETF" -> "ETF"
+                        "INDEX" -> "지수"
+                        "MUTUALFUND", "FUND" -> "펀드"
+                        else -> quote.quoteType
+                    }
+                    FinnhubSymbolResult(
+                        symbol = quote.symbol,
+                        displaySymbol = quote.symbol,
+                        description = quote.longname.ifBlank { quote.shortname },
+                        type = typeLabel,
+                    )
                 }
-                FinnhubSymbolResult(
-                    symbol = quote.symbol,
-                    displaySymbol = quote.symbol,
-                    description = quote.longname.ifBlank { quote.shortname },
-                    type = typeLabel,
-                )
-            }
-    } catch (_: Exception) { emptyList() }
+        } catch (_: Exception) { emptyList() }
+    }
 
     suspend fun addSymbol(symbol: String): Boolean {
         if (dao.countBySymbol(symbol.uppercase()) > 0) return false

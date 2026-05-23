@@ -44,7 +44,7 @@ class CalendarRepository(private val dao: CalendarEventDao) {
         try {
             val response = service.getEconomicCalendar(apiKey)
             events += (response.economicCalendar ?: emptyList())
-                .filter { isHighImpact(it) }
+                .filter { isHighImpact(it) && it.country.uppercase() in MAJOR_COUNTRIES }
                 .mapNotNull { it.toCalendarEvent() }
         } catch (e: Exception) {
             errors += "경제 캘린더: ${e.message}"
@@ -165,6 +165,8 @@ class CalendarRepository(private val dao: CalendarEventDao) {
     } catch (_: Exception) { null }
 
     companion object {
+        val MAJOR_COUNTRIES = setOf("US", "EU", "JP", "KR", "GB", "CN")
+
         val MAJOR_TICKERS = setOf(
             "NVDA", "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "META", "TSLA",
             "AMD", "INTC", "QCOM", "TSM", "ASML", "AVGO",

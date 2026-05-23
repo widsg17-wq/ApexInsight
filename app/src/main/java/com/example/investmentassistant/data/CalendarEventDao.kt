@@ -24,4 +24,7 @@ interface CalendarEventDao {
 
     @Query("DELETE FROM calendar_events WHERE scheduledAt < :beforeMs")
     suspend fun deleteOldEvents(beforeMs: Long)
+
+    @Query("DELETE FROM calendar_events WHERE type = 'ECONOMIC' AND country NOT IN (:countries)")
+    suspend fun deleteEconomicEventsFromNonMajorCountries(countries: List<String>)
 }

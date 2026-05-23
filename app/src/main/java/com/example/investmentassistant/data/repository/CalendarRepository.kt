@@ -9,6 +9,7 @@ import com.example.investmentassistant.data.toEntity
 import com.example.investmentassistant.model.CalendarEvent
 import com.example.investmentassistant.model.EventImportance
 import com.example.investmentassistant.model.EventType
+import android.util.Log
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.time.LocalDate
@@ -43,9 +44,12 @@ class CalendarRepository(private val dao: CalendarEventDao) {
 
         try {
             val response = service.getEconomicCalendar(apiKey)
-            events += (response.economicCalendar ?: emptyList())
+            val filtered = (response.economicCalendar ?: emptyList())
                 .filter { isHighImpact(it) && it.country.uppercase() in MAJOR_COUNTRIES }
-                .mapNotNull { it.toCalendarEvent() }
+            filtered.forEach { e ->
+                Log.d("CalendarRepo", "[${e.country}] ${e.event} | prev=${e.prev} est=${e.estimate} actual=${e.actual} unit=${e.unit} time=${e.time}")
+            }
+            events += filtered.mapNotNull { it.toCalendarEvent() }
         } catch (e: Exception) {
             errors += "경제 캘린더: ${e.message}"
         }
@@ -72,6 +76,7 @@ class CalendarRepository(private val dao: CalendarEventDao) {
 
         val cutoff = today.minusDays(14).atStartOfDay(kst).toInstant().toEpochMilli()
         dao.deleteOldEvents(cutoff)
+        dao.deleteEconomicEventsFromNonMajorCountries(MAJOR_COUNTRIES.toList())
     }
 
     suspend fun getEventsForDateRange(fromMs: Long, toMs: Long): List<CalendarEvent> =

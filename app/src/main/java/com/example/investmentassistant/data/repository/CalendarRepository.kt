@@ -92,6 +92,11 @@ class CalendarRepository(private val dao: CalendarEventDao) {
 
     private fun isHighImpact(event: FinnhubEconomicEvent): Boolean {
         val isHigh = event.impact?.equals("high", ignoreCase = true) == true
+        val lower = event.event.lowercase()
+        // 발언·연설 이벤트는 high impact인 것만 포함 (개별 위원 스피치 필터링)
+        val isSpeechEvent = (lower.contains("speaks") || lower.contains("speech") || lower.contains("testif")) &&
+            !lower.contains("press conference")
+        if (isSpeechEvent) return isHigh
         val isImportantKeyword = IMPORTANT_KEYWORDS.any { event.event.contains(it, ignoreCase = true) }
         return isHigh || isImportantKeyword
     }
@@ -192,7 +197,7 @@ class CalendarRepository(private val dao: CalendarEventDao) {
         )
 
         val IMPORTANT_KEYWORDS = listOf(
-            "CPI", "PPI", "Fed", "FOMC", "GDP", "NFP", "Unemployment",
+            "CPI", "PPI", "FOMC", "GDP", "NFP", "Unemployment",
             "PCE", "ISM", "Retail Sales", "Rate Decision", "Interest Rate",
             "Inflation", "Payroll", "Nonfarm",
         )
@@ -210,13 +215,11 @@ class CalendarRepository(private val dao: CalendarEventDao) {
         )
 
         private val EVENT_NAMES = mapOf(
-            "cpi" to "소비자물가지수 (CPI)",
-            "ppi" to "생산자물가지수 (PPI)",
             "core cpi" to "근원 CPI",
             "core pce" to "근원 PCE",
+            "cpi" to "소비자물가지수 (CPI)",
+            "ppi" to "생산자물가지수 (PPI)",
             "pce" to "개인소비지출 (PCE)",
-            "fomc" to "FOMC 회의",
-            "fed" to "연준 기준금리",
             "interest rate" to "기준금리 결정",
             "rate decision" to "기준금리 결정",
             "gdp" to "GDP 성장률",
@@ -248,6 +251,28 @@ class CalendarRepository(private val dao: CalendarEventDao) {
                 lower.contains("qoq") || lower.contains("q/q") -> " (분기)"
                 else -> ""
             }
+
+            // FOMC / Fed 이벤트 세분화 (구체적인 패턴 우선)
+            if (lower.contains("fomc") || lower.contains("federal open market")) {
+                return when {
+                    lower.contains("minutes") -> "FOMC 의사록"
+                    lower.contains("press conference") -> "FOMC 기자회견"
+                    lower.contains("statement") -> "FOMC 성명서"
+                    lower.contains("speaks") || lower.contains("speech") || lower.contains("member") -> "FOMC 위원 발언"
+                    else -> "FOMC 기준금리 결정"
+                }
+            }
+            if (lower.contains("beige book")) return "연준 베이지북"
+            if (lower.contains("fed ") || lower.startsWith("fed'") || lower.contains("federal reserve")) {
+                return when {
+                    lower.contains("minutes") -> "FOMC 의사록"
+                    lower.contains("funds rate") || (lower.contains("rate") && lower.contains("decision")) -> "연준 기준금리 결정"
+                    lower.contains("chair") && (lower.contains("speaks") || lower.contains("speech") || lower.contains("testif")) -> "연준 의장 발언"
+                    lower.contains("speaks") || lower.contains("speech") || lower.contains("testif") -> "연준 위원 발언"
+                    else -> "연준 발표"
+                }
+            }
+
             EVENT_NAMES.forEach { (key, value) ->
                 if (lower.contains(key)) return value + suffix
             }

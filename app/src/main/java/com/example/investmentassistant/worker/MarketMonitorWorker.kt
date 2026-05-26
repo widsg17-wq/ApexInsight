@@ -2,9 +2,12 @@ package com.example.investmentassistant.worker
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.work.*
+import com.example.investmentassistant.MainActivity
 import com.example.investmentassistant.R
 import com.example.investmentassistant.data.AppDatabase
 import com.example.investmentassistant.data.repository.WatchlistRepository
@@ -21,14 +24,26 @@ class MarketMonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         alerts.forEach { alert ->
             val direction = if ((alert.quote.dp) > 0) "급등" else "급락"
+            val notificationId = NOTIFICATION_ID_BASE + alert.item.id.toInt()
+            val pendingIntent = PendingIntent.getActivity(
+                applicationContext,
+                notificationId,
+                Intent(applicationContext, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    putExtra(MainActivity.EXTRA_DESTINATION, "watchlist")
+                },
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
             val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("${alert.item.displayName} $direction ${"%.1f".format(alert.quote.dp)}%")
                 .setContentText(alert.analysis.take(100))
                 .setStyle(NotificationCompat.BigTextStyle().bigText(alert.analysis))
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .build()
-            manager.notify(NOTIFICATION_ID_BASE + alert.item.id.toInt(), notification)
+            manager.notify(notificationId, notification)
         }
 
         return Result.success()

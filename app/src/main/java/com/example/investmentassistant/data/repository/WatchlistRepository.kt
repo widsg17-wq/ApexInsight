@@ -154,6 +154,7 @@ class WatchlistRepository(private val dao: WatchlistDao) {
 
                 val isAlert = Math.abs(changePercent) >= entity.threshold
                     && now - entity.lastAlertAt > 60 * 60 * 1000
+                    && isMarketOpenForExchange(entity.exchange)
 
                 val finnhubQuote = FinnhubQuote(c = price, dp = changePercent)
                 var alertMessage: String? = entity.lastAlertMessage
@@ -221,18 +222,28 @@ class WatchlistRepository(private val dao: WatchlistDao) {
     }
 
     companion object {
-        fun isMarketOpen(): Boolean {
+        fun isUSMarketOpen(): Boolean {
             val now = ZonedDateTime.now()
             val dow = now.dayOfWeek
             if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) return false
-
             val etTime = now.withZoneSameInstant(ZoneId.of("America/New_York")).toLocalTime()
-            if (etTime.isAfter(LocalTime.of(9, 29)) && etTime.isBefore(LocalTime.of(16, 1))) return true
+            return etTime.isAfter(LocalTime.of(9, 29)) && etTime.isBefore(LocalTime.of(16, 1))
+        }
 
+        fun isKRMarketOpen(): Boolean {
+            val now = ZonedDateTime.now()
+            val dow = now.dayOfWeek
+            if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) return false
             val kstTime = now.withZoneSameInstant(ZoneId.of("Asia/Seoul")).toLocalTime()
-            if (kstTime.isAfter(LocalTime.of(8, 59)) && kstTime.isBefore(LocalTime.of(15, 31))) return true
+            return kstTime.isAfter(LocalTime.of(8, 59)) && kstTime.isBefore(LocalTime.of(15, 31))
+        }
 
-            return false
+        fun isMarketOpen(): Boolean = isUSMarketOpen() || isKRMarketOpen()
+
+        fun isMarketOpenForExchange(exchange: String): Boolean = when (exchange) {
+            "KR" -> isKRMarketOpen()
+            "INDEX" -> isUSMarketOpen() || isKRMarketOpen()
+            else -> isUSMarketOpen()
         }
     }
 }

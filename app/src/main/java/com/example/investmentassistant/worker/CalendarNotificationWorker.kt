@@ -2,10 +2,13 @@ package com.example.investmentassistant.worker
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.investmentassistant.MainActivity
 import com.example.investmentassistant.R
 import com.example.investmentassistant.data.AppDatabase
 import com.example.investmentassistant.data.repository.CalendarRepository
@@ -48,11 +51,22 @@ class CalendarNotificationWorker(
             EventType.EARNINGS -> buildEarningsBody(event)
         }
 
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID_BASE + event.id.hashCode(),
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(MainActivity.EXTRA_DESTINATION, "calendar")
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
         val notificationId = NOTIFICATION_ID_BASE + event.id.hashCode()
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("📅 ${event.title}")
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()

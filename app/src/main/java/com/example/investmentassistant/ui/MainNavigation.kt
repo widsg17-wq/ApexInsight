@@ -16,6 +16,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.launch
 
 private enum class TopDest(val label: String, val icon: ImageVector, val route: String) {
     DASHBOARD("대시보드", Icons.Default.Home, "dashboard"),
@@ -27,8 +28,21 @@ private enum class TopDest(val label: String, val icon: ImageVector, val route: 
 }
 
 @Composable
-fun MainAppScreen() {
+fun MainAppScreen(initialDestination: String? = null) {
     val navController = rememberNavController()
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(initialDestination) {
+        if (initialDestination != null) {
+            scope.launch {
+                navController.navigate(initialDestination) {
+                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = { ApexBottomBar(navController) }

@@ -2,15 +2,19 @@ package com.example.investmentassistant.worker
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.investmentassistant.MainActivity
 import com.example.investmentassistant.R
 import com.example.investmentassistant.data.AppDatabase
 import com.example.investmentassistant.data.IndicatorSnapshot
 import com.example.investmentassistant.data.repository.AiRepository
 import com.example.investmentassistant.data.repository.MacroRepository
+import com.example.investmentassistant.data.repository.WatchlistRepository
 import com.example.investmentassistant.model.MacroIndicators
 import com.example.investmentassistant.model.TimeRange
 
@@ -34,6 +38,9 @@ class IndicatorAlertWorker(
         val currentMap = current.toMap()
         val previous = db.indicatorSnapshotDao().getAll().associateBy { it.key }
 
+        val usMarketOpen = WatchlistRepository.isUSMarketOpen()
+        val krMarketOpen = WatchlistRepository.isKRMarketOpen()
+
         // 지표 급변 체크
         val alerts = mutableListOf<String>()
         currentMap.forEach { (key, currentVal) ->
@@ -45,6 +52,14 @@ class IndicatorAlertWorker(
             val threshold = THRESHOLDS[key] ?: return@forEach
 
             if (Math.abs(changePct) >= threshold) {
+                // 해당 시장이 열려있을 때만 알림
+                val marketOpen = when (key) {
+                    "kospi" -> krMarketOpen
+                    "btc" -> true
+                    else -> usMarketOpen
+                }
+                if (!marketOpen) return@forEach
+
                 val direction = if (changePct > 0) "▲" else "▼"
                 val name = DISPLAY_NAMES[key] ?: key
                 alerts.add("$name $direction ${"%.1f".format(Math.abs(changePct))}%")
@@ -60,8 +75,8 @@ class IndicatorAlertWorker(
             sendNotification(alerts)
         }
 
-        // 투자 포인트 감지 (토글이 켜진 경우)
-        if (prefs.getBoolean("investment_alert_enabled", false)) {
+        // 투자 포인트 감지 (토글이 켜진 경우, 미국 또는 한국 장 중 하나가 열려있을 때만)
+        if (prefs.getBoolean("investment_alert_enabled", false) && (usMarketOpen || krMarketOpen)) {
             val signal = aiRepo.detectInvestmentOpportunity(current)
             if (signal != null) {
                 sendInvestmentSignalNotification(signal)
@@ -70,6 +85,16 @@ class IndicatorAlertWorker(
 
         return Result.success()
     }
+
+    private fun buildDashboardIntent(requestCode: Int) = PendingIntent.getActivity(
+        context,
+        requestCode,
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_DESTINATION, "dashboard")
+        },
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
     private fun sendNotification(alerts: List<String>) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -86,6 +111,7 @@ class IndicatorAlertWorker(
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("📊 지표 급변 감지 (${alerts.size}개)")
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentIntent(buildDashboardIntent(NOTIFICATION_ID))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
@@ -107,6 +133,7 @@ class IndicatorAlertWorker(
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("🎯 투자 포인트 감지")
             .setStyle(NotificationCompat.BigTextStyle().bigText(signal))
+            .setContentIntent(buildDashboardIntent(SIGNAL_NOTIFICATION_ID))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()

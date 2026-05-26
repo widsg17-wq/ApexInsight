@@ -2,10 +2,13 @@ package com.example.investmentassistant.worker
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.investmentassistant.MainActivity
 import com.example.investmentassistant.R
 import com.example.investmentassistant.data.AppDatabase
 import com.example.investmentassistant.data.repository.AiRepository
@@ -78,6 +81,16 @@ class AutoReportWorker(
         return Result.success()
     }
 
+    private fun buildArchiveIntent(requestCode: Int) = PendingIntent.getActivity(
+        context,
+        requestCode,
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_DESTINATION, "archive")
+        },
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
     private fun sendNotification(keywords: List<String>) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -89,10 +102,13 @@ class AutoReportWorker(
         manager.createNotificationChannel(channel)
 
         val keywordText = keywords.joinToString(", ")
+        val body = "[$keywordText] 리포트가 보관함에 저장됐습니다."
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("새 AI 리포트가 생성됐습니다")
-            .setContentText("[$keywordText] 리포트가 보관함에 저장됐습니다.")
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentIntent(buildArchiveIntent(NOTIFICATION_ID))
             .setAutoCancel(true)
             .build()
 
@@ -113,6 +129,7 @@ class AutoReportWorker(
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("⚠️ [$keyword] 시장 급변 감지")
             .setStyle(NotificationCompat.BigTextStyle().bigText(changeDescription))
+            .setContentIntent(buildArchiveIntent(ALERT_NOTIFICATION_ID))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()

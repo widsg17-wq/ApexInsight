@@ -2,6 +2,8 @@ package com.example.investmentassistant.fake
 
 import com.example.investmentassistant.data.repository.AiRepository
 import com.example.investmentassistant.data.repository.AiResult
+import com.example.investmentassistant.data.repository.TradeRecommendation
+import com.example.investmentassistant.data.repository.TradeSignal
 import com.example.investmentassistant.model.MacroIndicators
 import com.example.investmentassistant.model.NewsArticle
 
@@ -35,4 +37,20 @@ class FakeAiRepository : AiRepository {
 
     override suspend fun detectInvestmentOpportunity(indicators: MacroIndicators): String? =
         opportunityResult
+
+    override suspend fun generateTradeRecommendation(
+        symbol: String,
+        name: String,
+        currentPrice: Double,
+        changePercent: Double,
+        recentNewsHeadlines: List<String>,
+        macroSummary: String,
+    ): TradeRecommendation = TradeRecommendation(
+        signal = TradeSignal.HOLD,
+        confidence = "중간",
+        summary = "테스트 추천",
+        reasoning = "테스트 분석 결과입니다.",
+        targetPrice = null,
+        riskNote = "테스트 리스크",
+    )
 }

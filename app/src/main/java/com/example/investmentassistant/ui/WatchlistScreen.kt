@@ -31,7 +31,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.investmentassistant.api.FinnhubSymbolResult
+import com.example.investmentassistant.data.repository.TradeSignal
 import com.example.investmentassistant.model.WatchlistItem
+import com.example.investmentassistant.viewmodel.TradeSignalState
 import com.example.investmentassistant.viewmodel.WatchlistViewModel
 import java.time.Instant
 import java.time.ZoneId
@@ -109,7 +111,11 @@ fun WatchlistScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(items, key = { it.id }) { item ->
-                        WatchlistCard(item = item, onDelete = { viewModel.removeItem(item.id) })
+                        WatchlistCard(
+                            item = item,
+                            onDelete = { viewModel.removeItem(item.id) },
+                            onAnalyze = { viewModel.analyzeItem(item) },
+                        )
                     }
                 }
             }
@@ -131,6 +137,14 @@ fun WatchlistScreen(
                 showAddDialog = false
                 viewModel.clearAddState()
             },
+        )
+    }
+
+    val tradeSignal by viewModel.tradeSignal.collectAsStateWithLifecycle()
+    if (tradeSignal !is TradeSignalState.Idle) {
+        TradeSignalDialog(
+            state = tradeSignal,
+            onDismiss = { viewModel.clearTradeSignal() },
         )
     }
 }
@@ -232,7 +246,11 @@ private fun SearchResultItem(result: FinnhubSymbolResult, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WatchlistCard(item: WatchlistItem, onDelete: () -> Unit) {
+private fun WatchlistCard(
+    item: WatchlistItem,
+    onDelete: () -> Unit,
+    onAnalyze: () -> Unit = {},
+) {
     var showAnalysis by remember { mutableStateOf(false) }
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -260,6 +278,12 @@ private fun WatchlistCard(item: WatchlistItem, onDelete: () -> Unit) {
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                TextButton(
+                    onClick = onAnalyze,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text("AI 진단", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, "삭제", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -306,4 +330,88 @@ private fun WatchlistCard(item: WatchlistItem, onDelete: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun TradeSignalDialog(
+    state: TradeSignalState,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("AI 투자 진단") },
+        text = {
+            when (state) {
+                TradeSignalState.Loading -> {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    ) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.height(12.dp))
+                        Text("AI가 매크로 환경과 최근 뉴스를 분석 중입니다...", fontSize = 13.sp)
+                    }
+                }
+                is TradeSignalState.Success -> {
+                    val rec = state.recommendation
+                    val (signalText, signalColor) = when (rec.signal) {
+                        TradeSignal.BUY  -> "매수 ▲" to Color(0xFF1B5E20)
+                        TradeSignal.SELL -> "매도 ▼" to Color(0xFFB71C1C)
+                        TradeSignal.HOLD -> "보유 ─" to Color(0xFFE65100)
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Surface(
+                                color = signalColor,
+                                shape = MaterialTheme.shapes.medium,
+                            ) {
+                                Text(
+                                    signalText,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                )
+                            }
+                            Text("신뢰도: ${rec.confidence}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text(rec.summary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        HorizontalDivider()
+                        Text(rec.reasoning, fontSize = 13.sp, lineHeight = 20.sp)
+                        if (rec.targetPrice != null) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("목표가:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(rec.targetPrice, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                            shape = MaterialTheme.shapes.small,
+                        ) {
+                            Row(modifier = Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("⚠️", fontSize = 11.sp)
+                                Text(rec.riskNote, fontSize = 11.sp, color = MaterialTheme.colorScheme.onErrorContainer)
+                            }
+                        }
+                        Text(
+                            "※ AI 분석은 투자 참고용이며 투자 결정의 책임은 본인에게 있습니다.",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                is TradeSignalState.Error -> {
+                    Text(state.message, color = MaterialTheme.colorScheme.error)
+                }
+                TradeSignalState.Idle -> {}
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("닫기") }
+        },
+    )
 }

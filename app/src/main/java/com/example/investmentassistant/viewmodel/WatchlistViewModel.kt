@@ -3,7 +3,11 @@ package com.example.investmentassistant.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.investmentassistant.api.FinnhubSymbolResult
+import com.example.investmentassistant.data.repository.AiRepository
+import com.example.investmentassistant.data.repository.MacroRepository
+import com.example.investmentassistant.data.repository.TradeRecommendation
 import com.example.investmentassistant.data.repository.WatchlistRepository
+import com.example.investmentassistant.model.TimeRange
 import com.example.investmentassistant.model.WatchlistItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
@@ -24,10 +28,19 @@ data class WatchlistUiState(
     val refreshError: String? = null,
 )
 
+sealed interface TradeSignalState {
+    data object Idle : TradeSignalState
+    data object Loading : TradeSignalState
+    data class Success(val recommendation: TradeRecommendation) : TradeSignalState
+    data class Error(val message: String) : TradeSignalState
+}
+
 @OptIn(FlowPreview::class)
 @HiltViewModel
 class WatchlistViewModel @Inject constructor(
     private val repo: WatchlistRepository,
+    private val aiRepository: AiRepository,
+    private val macroRepository: MacroRepository,
 ) : ViewModel() {
 
     val items: StateFlow<List<WatchlistItem>> = repo.getAll()
@@ -44,6 +57,9 @@ class WatchlistViewModel @Inject constructor(
 
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
+
+    private val _tradeSignal = MutableStateFlow<TradeSignalState>(TradeSignalState.Idle)
+    val tradeSignal: StateFlow<TradeSignalState> = _tradeSignal.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -108,6 +124,34 @@ class WatchlistViewModel @Inject constructor(
             }
         }
     }
+
+    fun analyzeItem(item: WatchlistItem) {
+        viewModelScope.launch {
+            _tradeSignal.value = TradeSignalState.Loading
+            try {
+                val macro = macroRepository.fetchAllIndicators(TimeRange.M1)
+                val macroSummary = "S&P500: ${macro.sp500.latestValue}, VIX: ${macro.vix.latestValue}, " +
+                    "미 10년물: ${macro.us10y.latestValue}, 달러: ${macro.dollarIndex.latestValue}, " +
+                    "Fear&Greed: ${macro.fearGreed.latestValue}"
+
+                val newsHeadlines = repo.fetchRecentNewsHeadlines(item.symbol)
+
+                val recommendation = aiRepository.generateTradeRecommendation(
+                    symbol = item.symbol,
+                    name = item.displayName,
+                    currentPrice = item.lastPrice ?: 0.0,
+                    changePercent = item.lastChangePercent ?: 0.0,
+                    recentNewsHeadlines = newsHeadlines,
+                    macroSummary = macroSummary,
+                )
+                _tradeSignal.value = TradeSignalState.Success(recommendation)
+            } catch (e: Exception) {
+                _tradeSignal.value = TradeSignalState.Error("분석 실패: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun clearTradeSignal() { _tradeSignal.value = TradeSignalState.Idle }
 
     fun clearRefreshError() { _uiState.value = _uiState.value.copy(refreshError = null) }
 

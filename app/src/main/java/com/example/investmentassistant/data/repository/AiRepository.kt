@@ -9,13 +9,30 @@ import kotlinx.coroutines.withContext
 
 data class AiResult(val text: String, val tokenCount: Int, val tokenUsageStr: String)
 
+enum class TradeSignal { BUY, SELL, HOLD }
+
+data class TradeRecommendation(
+    val signal: TradeSignal,
+    val confidence: String,   // 높음 / 중간 / 낮음
+    val summary: String,      // 한 줄 핵심 근거
+    val reasoning: String,    // 상세 분석
+    val targetPrice: String?, // 목표가 (제시 가능 시)
+    val riskNote: String,     // 주요 리스크
+)
+
 interface AiRepository {
     suspend fun generateNewsReport(articles: List<NewsArticle>, searchQuery: String): AiResult
     suspend fun generateMacroInsight(indicators: MacroIndicators): AiResult
-    // 직전 리포트와 신규 리포트를 비교해 급변 여부 감지. 급변 시 변화 요약 반환, 없으면 null
     suspend fun detectSignificantChange(previousReport: String, newReport: String, keyword: String): String?
-    // 현재 지표를 분석해 투자 포인트 반환. 신호 없으면 null
     suspend fun detectInvestmentOpportunity(indicators: MacroIndicators): String?
+    suspend fun generateTradeRecommendation(
+        symbol: String,
+        name: String,
+        currentPrice: Double,
+        changePercent: Double,
+        recentNewsHeadlines: List<String>,
+        macroSummary: String,
+    ): TradeRecommendation
 }
 
 private class AiRepositoryImpl : AiRepository {
@@ -143,6 +160,79 @@ private class AiRepositoryImpl : AiRepository {
         } catch (e: Exception) {
             null
         }
+    }
+
+    override suspend fun generateTradeRecommendation(
+        symbol: String,
+        name: String,
+        currentPrice: Double,
+        changePercent: Double,
+        recentNewsHeadlines: List<String>,
+        macroSummary: String,
+    ): TradeRecommendation = withContext(Dispatchers.IO) {
+        val newsText = if (recentNewsHeadlines.isEmpty()) "최근 관련 뉴스 없음"
+        else recentNewsHeadlines.take(5).joinToString("\n") { "- $it" }
+
+        val prompt = """
+            당신은 10년 경력의 월스트리트 포트폴리오 매니저입니다.
+            아래 정보를 바탕으로 '$name ($symbol)'에 대한 투자 판단을 내려주세요.
+
+            [현재 시세]
+            현재가: ${"%.2f".format(currentPrice)}
+            당일 변동: ${"%.2f".format(changePercent)}%
+
+            [최근 뉴스]
+            $newsText
+
+            [매크로 환경]
+            $macroSummary
+
+            다음 JSON 형식으로만 답하세요. 다른 텍스트는 절대 포함하지 마세요:
+            {
+              "signal": "BUY" 또는 "SELL" 또는 "HOLD",
+              "confidence": "높음" 또는 "중간" 또는 "낮음",
+              "summary": "핵심 투자 근거 한 줄 (최대 50자)",
+              "reasoning": "상세 분석 2-3문장",
+              "targetPrice": "목표가 (제시 불가시 null)",
+              "riskNote": "주요 리스크 한 줄"
+            }
+        """.trimIndent()
+
+        try {
+            val response = model.generateContent(prompt)
+            val raw = response.text?.trim() ?: throw IllegalStateException("응답 없음")
+            val json = raw.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+            parseTradeRecommendation(json)
+        } catch (e: Exception) {
+            TradeRecommendation(
+                signal = TradeSignal.HOLD,
+                confidence = "낮음",
+                summary = "AI 분석 실패",
+                reasoning = "분석 중 오류가 발생했습니다: ${e.localizedMessage}",
+                targetPrice = null,
+                riskNote = "분석 불가",
+            )
+        }
+    }
+
+    private fun parseTradeRecommendation(json: String): TradeRecommendation {
+        fun extract(key: String): String? {
+            val pattern = Regex(""""$key"\s*:\s*"([^"]*?)"""")
+            return pattern.find(json)?.groupValues?.get(1)
+        }
+        val signalStr = extract("signal")?.uppercase() ?: "HOLD"
+        return TradeRecommendation(
+            signal = when (signalStr) {
+                "BUY" -> TradeSignal.BUY
+                "SELL" -> TradeSignal.SELL
+                else -> TradeSignal.HOLD
+            },
+            confidence = extract("confidence") ?: "낮음",
+            summary = extract("summary") ?: "-",
+            reasoning = extract("reasoning") ?: "-",
+            targetPrice = extract("targetPrice")?.takeIf { it != "null" },
+            riskNote = extract("riskNote") ?: "-",
+        )
     }
 
     private suspend fun call(prompt: String): AiResult = withContext(Dispatchers.IO) {

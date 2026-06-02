@@ -186,6 +186,12 @@ class WatchlistRepository(private val dao: WatchlistDao) {
         Pair(price, changePercent)
     } catch (_: Exception) { Pair(0.0, 0.0) }
 
+    suspend fun fetchRecentNewsHeadlines(symbol: String): List<String> = try {
+        val today = ZonedDateTime.now().format(dateFmt)
+        val threeDaysAgo = ZonedDateTime.now().minusDays(3).format(dateFmt)
+        service.getCompanyNews(symbol, threeDaysAgo, today, apiKey).take(7).map { it.headline }
+    } catch (_: Exception) { emptyList() }
+
     private suspend fun fetchRecentNews(symbol: String): List<FinnhubNewsItem> = try {
         val today = ZonedDateTime.now().format(dateFmt)
         val threeDaysAgo = ZonedDateTime.now().minusDays(3).format(dateFmt)

@@ -1,11 +1,10 @@
 package com.example.investmentassistant.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.investmentassistant.data.AppDatabase
 import com.example.investmentassistant.data.repository.CalendarRepository
 import com.example.investmentassistant.model.CalendarEvent
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,6 +12,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
+import javax.inject.Inject
 
 data class CalendarUiState(
     val isLoading: Boolean = false,
@@ -26,12 +26,12 @@ data class CalendarUiState(
     val error: String? = null,
 )
 
-class CalendarViewModel(app: Application) : AndroidViewModel(app) {
+@HiltViewModel
+class CalendarViewModel @Inject constructor(
+    private val repository: CalendarRepository,
+) : ViewModel() {
 
     private val kst = ZoneId.of("Asia/Seoul")
-    private val repository by lazy {
-        CalendarRepository(AppDatabase.getDatabase(app).calendarEventDao())
-    }
 
     private val _uiState = MutableStateFlow(CalendarUiState(isLoading = true))
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()

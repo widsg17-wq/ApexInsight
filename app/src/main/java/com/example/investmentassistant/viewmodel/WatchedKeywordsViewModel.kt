@@ -1,8 +1,7 @@
 package com.example.investmentassistant.viewmodel
 
-import android.app.Application
-import android.content.Context
-import androidx.lifecycle.AndroidViewModel
+import android.content.SharedPreferences
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -13,6 +12,7 @@ import com.example.investmentassistant.data.WatchedKeyword
 import com.example.investmentassistant.data.repository.WatchedKeywordRepository
 import com.example.investmentassistant.worker.AutoReportWorker
 import com.example.investmentassistant.worker.IndicatorAlertWorker
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,12 +20,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Named
 
-class WatchedKeywordsViewModel(app: Application) : AndroidViewModel(app) {
-
-    private val repository = WatchedKeywordRepository(app)
-    private val workManager = WorkManager.getInstance(app)
-    private val prefs = app.getSharedPreferences("alert_prefs", Context.MODE_PRIVATE)
+@HiltViewModel
+class WatchedKeywordsViewModel @Inject constructor(
+    private val repository: WatchedKeywordRepository,
+    private val workManager: WorkManager,
+    @Named("alert_prefs") private val prefs: SharedPreferences,
+) : ViewModel() {
 
     val keywords: StateFlow<List<WatchedKeyword>> = repository.getAllKeywords()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

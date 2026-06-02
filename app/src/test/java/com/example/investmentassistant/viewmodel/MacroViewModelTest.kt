@@ -1,7 +1,5 @@
 package com.example.investmentassistant.viewmodel
 
-import android.app.Application
-import androidx.test.core.app.ApplicationProvider
 import com.example.investmentassistant.fake.FakeAiRepository
 import com.example.investmentassistant.fake.FakeMacroRepository
 import com.example.investmentassistant.fake.FakeReportRepository
@@ -20,11 +18,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@RunWith(RobolectricTestRunner::class)
 class MacroViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
@@ -40,8 +35,7 @@ class MacroViewModelTest {
         macroRepo = FakeMacroRepository()
         aiRepo = FakeAiRepository()
         reportRepo = FakeReportRepository()
-        val app = ApplicationProvider.getApplicationContext<Application>()
-        viewModel = MacroViewModel(app, macroRepo, aiRepo, reportRepo)
+        viewModel = MacroViewModel(macroRepo, aiRepo, reportRepo)
     }
 
     @After

@@ -7,7 +7,9 @@ import com.example.investmentassistant.worker.AutoReportWorker
 import com.example.investmentassistant.worker.CalendarNotificationWorker
 import com.example.investmentassistant.worker.IndicatorAlertWorker
 import com.example.investmentassistant.worker.MarketMonitorWorker
+import dagger.hilt.android.HiltAndroidApp
 
+@HiltAndroidApp
 class InvestmentApp : Application() {
 
     override fun onCreate() {

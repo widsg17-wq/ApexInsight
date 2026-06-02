@@ -1,19 +1,20 @@
 package com.example.investmentassistant.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.investmentassistant.data.repository.AiRepository
 import com.example.investmentassistant.data.repository.NewsRepository
 import com.example.investmentassistant.data.repository.ReportRepository
 import com.example.investmentassistant.model.DateRange
 import com.example.investmentassistant.model.NewsArticle
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import javax.inject.Inject
 
 sealed interface NewsUiState {
     data object Idle : NewsUiState
@@ -22,12 +23,12 @@ sealed interface NewsUiState {
     data class Error(val message: String) : NewsUiState
 }
 
-class NewsViewModel(
-    app: Application,
-    private val newsRepository: NewsRepository = NewsRepository(),
-    private val aiRepository: AiRepository = AiRepository(),
-    private val reportRepository: ReportRepository = ReportRepository(app),
-) : AndroidViewModel(app) {
+@HiltViewModel
+class NewsViewModel @Inject constructor(
+    private val newsRepository: NewsRepository,
+    private val aiRepository: AiRepository,
+    private val reportRepository: ReportRepository,
+) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()

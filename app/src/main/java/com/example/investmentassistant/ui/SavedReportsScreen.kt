@@ -12,7 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.investmentassistant.data.SavedReport
 import com.example.investmentassistant.data.TokenRecord
 import com.example.investmentassistant.viewmodel.SavedReportsViewModel
@@ -24,7 +24,7 @@ import java.util.Locale
 @Composable
 fun SavedReportsScreen(
     bottomPadding: PaddingValues = PaddingValues(),
-    viewModel: SavedReportsViewModel = viewModel(),
+    viewModel: SavedReportsViewModel = hiltViewModel(),
 ) {
     val reports by viewModel.reports.collectAsState()
     val tokenRecords by viewModel.tokenRecords.collectAsState()

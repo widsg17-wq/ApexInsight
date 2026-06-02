@@ -1,24 +1,25 @@
 package com.example.investmentassistant.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.investmentassistant.data.repository.AiRepository
 import com.example.investmentassistant.data.repository.MacroRepository
 import com.example.investmentassistant.data.repository.ReportRepository
 import com.example.investmentassistant.model.MacroIndicators
 import com.example.investmentassistant.model.TimeRange
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class MacroViewModel(
-    app: Application,
-    private val macroRepository: MacroRepository = MacroRepository(),
-    private val aiRepository: AiRepository = AiRepository(),
-    private val reportRepository: ReportRepository = ReportRepository(app),
-) : AndroidViewModel(app) {
+@HiltViewModel
+class MacroViewModel @Inject constructor(
+    private val macroRepository: MacroRepository,
+    private val aiRepository: AiRepository,
+    private val reportRepository: ReportRepository,
+) : ViewModel() {
 
     private val _selectedRange = MutableStateFlow(TimeRange.M1)
     val selectedRange: StateFlow<TimeRange> = _selectedRange.asStateFlow()

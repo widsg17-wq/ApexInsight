@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.investmentassistant.model.DateRange
 import com.example.investmentassistant.model.NewsArticle
 import com.example.investmentassistant.viewmodel.NewsUiState
@@ -29,7 +29,7 @@ import com.halilibo.richtext.ui.material3.RichText
 @Composable
 fun NewsSearchScreen(
     bottomPadding: PaddingValues = PaddingValues(),
-    viewModel: NewsViewModel = viewModel(),
+    viewModel: NewsViewModel = hiltViewModel(),
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedDateRange by viewModel.selectedDateRange.collectAsState()

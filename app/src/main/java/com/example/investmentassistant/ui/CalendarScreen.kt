@@ -21,7 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.investmentassistant.data.repository.CalendarRepository
 import com.example.investmentassistant.model.CalendarEvent
 import com.example.investmentassistant.model.EventImportance
@@ -38,7 +38,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun CalendarScreen(
     bottomPadding: PaddingValues,
-    viewModel: CalendarViewModel = viewModel(),
+    viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableIntStateOf(0) }

@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.investmentassistant.data.WatchedKeyword
 import com.example.investmentassistant.viewmodel.WatchedKeywordsViewModel
 import java.text.SimpleDateFormat
@@ -26,7 +26,7 @@ private val INTERVAL_OPTIONS = listOf(1, 6, 12, 24)
 @Composable
 fun WatchedKeywordsScreen(
     bottomPadding: PaddingValues = PaddingValues(),
-    viewModel: WatchedKeywordsViewModel = viewModel(),
+    viewModel: WatchedKeywordsViewModel = hiltViewModel(),
 ) {
     val keywords by viewModel.keywords.collectAsState()
     val indicatorAlertEnabled by viewModel.indicatorAlertEnabled.collectAsState()

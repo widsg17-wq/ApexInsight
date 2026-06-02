@@ -1,8 +1,7 @@
 package com.example.investmentassistant.data.repository
 
-import android.content.Context
-import com.example.investmentassistant.data.AppDatabase
 import com.example.investmentassistant.data.WatchedKeyword
+import com.example.investmentassistant.data.WatchedKeywordDao
 import kotlinx.coroutines.flow.Flow
 
 interface WatchedKeywordRepository {
@@ -12,8 +11,7 @@ interface WatchedKeywordRepository {
     suspend fun updateLastRunAt(keyword: WatchedKeyword, timestamp: Long)
 }
 
-private class WatchedKeywordRepositoryImpl(context: Context) : WatchedKeywordRepository {
-    private val dao = AppDatabase.getDatabase(context).watchedKeywordDao()
+private class WatchedKeywordRepositoryImpl(private val dao: WatchedKeywordDao) : WatchedKeywordRepository {
 
     override fun getAllKeywords(): Flow<List<WatchedKeyword>> = dao.getAllKeywords()
 
@@ -28,5 +26,5 @@ private class WatchedKeywordRepositoryImpl(context: Context) : WatchedKeywordRep
     }
 }
 
-fun WatchedKeywordRepository(context: Context): WatchedKeywordRepository =
-    WatchedKeywordRepositoryImpl(context)
+fun WatchedKeywordRepository(dao: WatchedKeywordDao): WatchedKeywordRepository =
+    WatchedKeywordRepositoryImpl(dao)

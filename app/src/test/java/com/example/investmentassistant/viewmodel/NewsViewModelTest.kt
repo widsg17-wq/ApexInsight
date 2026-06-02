@@ -1,7 +1,5 @@
 package com.example.investmentassistant.viewmodel
 
-import android.app.Application
-import androidx.test.core.app.ApplicationProvider
 import com.example.investmentassistant.fake.FakeAiRepository
 import com.example.investmentassistant.fake.FakeNewsRepository
 import com.example.investmentassistant.fake.FakeReportRepository
@@ -18,11 +16,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@RunWith(RobolectricTestRunner::class)
 class NewsViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
@@ -38,8 +33,7 @@ class NewsViewModelTest {
         newsRepo = FakeNewsRepository()
         aiRepo = FakeAiRepository()
         reportRepo = FakeReportRepository()
-        val app = ApplicationProvider.getApplicationContext<Application>()
-        viewModel = NewsViewModel(app, newsRepo, aiRepo, reportRepo)
+        viewModel = NewsViewModel(newsRepo, aiRepo, reportRepo)
     }
 
     @After

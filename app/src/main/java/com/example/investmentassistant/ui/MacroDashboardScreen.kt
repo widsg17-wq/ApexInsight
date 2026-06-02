@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.investmentassistant.model.MacroData
 import com.example.investmentassistant.model.MacroIndicators
 import com.example.investmentassistant.model.TimeRange
@@ -44,7 +44,7 @@ private enum class MacroTab(val title: String) {
 @Composable
 fun MacroDashboardScreen(
     bottomPadding: PaddingValues = PaddingValues(),
-    viewModel: MacroViewModel = viewModel(),
+    viewModel: MacroViewModel = hiltViewModel(),
 ) {
     var selectedTab by remember { mutableStateOf(MacroTab.PULSE) }
     val selectedRange by viewModel.selectedRange.collectAsState()
@@ -302,7 +302,7 @@ private fun KoreaContent(ind: MacroIndicators) {
 }
 
 @Composable
-private fun InsightContent(viewModel: MacroViewModel = viewModel()) {
+private fun InsightContent(viewModel: MacroViewModel = hiltViewModel()) {
     val insightText by viewModel.aiInsight.collectAsState()
     val isInsightLoading by viewModel.isInsightLoading.collectAsState()
     val tokenUsage by viewModel.tokenUsage.collectAsState()

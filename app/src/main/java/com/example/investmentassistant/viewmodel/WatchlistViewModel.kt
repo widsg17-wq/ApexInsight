@@ -1,12 +1,11 @@
 package com.example.investmentassistant.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.investmentassistant.api.FinnhubSymbolResult
-import com.example.investmentassistant.data.AppDatabase
 import com.example.investmentassistant.data.repository.WatchlistRepository
 import com.example.investmentassistant.model.WatchlistItem
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,6 +15,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 data class WatchlistUiState(
     val isRefreshing: Boolean = false,
@@ -25,9 +25,10 @@ data class WatchlistUiState(
 )
 
 @OptIn(FlowPreview::class)
-class WatchlistViewModel(app: Application) : AndroidViewModel(app) {
-
-    private val repo = WatchlistRepository(AppDatabase.getDatabase(app).watchlistDao())
+@HiltViewModel
+class WatchlistViewModel @Inject constructor(
+    private val repo: WatchlistRepository,
+) : ViewModel() {
 
     val items: StateFlow<List<WatchlistItem>> = repo.getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

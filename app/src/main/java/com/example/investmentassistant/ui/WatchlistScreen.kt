@@ -29,7 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.investmentassistant.api.FinnhubSymbolResult
 import com.example.investmentassistant.model.WatchlistItem
 import com.example.investmentassistant.viewmodel.WatchlistViewModel
@@ -41,7 +41,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun WatchlistScreen(
     bottomPadding: PaddingValues,
-    viewModel: WatchlistViewModel = viewModel(),
+    viewModel: WatchlistViewModel = hiltViewModel(),
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()

@@ -22,11 +22,12 @@ sealed interface NewsUiState {
     data class Error(val message: String) : NewsUiState
 }
 
-class NewsViewModel(app: Application) : AndroidViewModel(app) {
-
-    private val newsRepository: NewsRepository = NewsRepository()
-    private val aiRepository: AiRepository = AiRepository()
-    private val reportRepository: ReportRepository = ReportRepository(app)
+class NewsViewModel(
+    app: Application,
+    private val newsRepository: NewsRepository = NewsRepository(),
+    private val aiRepository: AiRepository = AiRepository(),
+    private val reportRepository: ReportRepository = ReportRepository(app),
+) : AndroidViewModel(app) {
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()

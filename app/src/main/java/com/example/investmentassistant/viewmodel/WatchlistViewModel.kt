@@ -21,6 +21,7 @@ data class WatchlistUiState(
     val isRefreshing: Boolean = false,
     val addError: String? = null,
     val addSuccess: Boolean = false,
+    val refreshError: String? = null,
 )
 
 @OptIn(FlowPreview::class)
@@ -94,11 +95,20 @@ class WatchlistViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refresh() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRefreshing = true)
-            repo.refreshQuotes()
-            _uiState.value = _uiState.value.copy(isRefreshing = false)
+            _uiState.value = _uiState.value.copy(isRefreshing = true, refreshError = null)
+            try {
+                repo.refreshQuotes()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    refreshError = "시세 갱신 실패: ${e.localizedMessage ?: "네트워크 오류"}"
+                )
+            } finally {
+                _uiState.value = _uiState.value.copy(isRefreshing = false)
+            }
         }
     }
+
+    fun clearRefreshError() { _uiState.value = _uiState.value.copy(refreshError = null) }
 
     fun clearAddState() {
         _uiState.value = _uiState.value.copy(addError = null, addSuccess = false)

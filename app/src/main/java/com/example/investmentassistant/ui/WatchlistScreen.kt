@@ -54,6 +54,13 @@ fun WatchlistScreen(
         }
     }
 
+    if (uiState.refreshError != null) {
+        LaunchedEffect(uiState.refreshError) {
+            kotlinx.coroutines.delay(4000)
+            viewModel.clearRefreshError()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().padding(bottomPadding)) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
@@ -68,6 +75,22 @@ fun WatchlistScreen(
                     }
                 }
             )
+            if (uiState.refreshError != null) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = uiState.refreshError!!,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+            }
+
             if (items.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {

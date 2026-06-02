@@ -13,11 +13,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class MacroViewModel(app: Application) : AndroidViewModel(app) {
-
-    private val macroRepository: MacroRepository = MacroRepository()
-    private val aiRepository: AiRepository = AiRepository()
-    private val reportRepository: ReportRepository = ReportRepository(app)
+class MacroViewModel(
+    app: Application,
+    private val macroRepository: MacroRepository = MacroRepository(),
+    private val aiRepository: AiRepository = AiRepository(),
+    private val reportRepository: ReportRepository = ReportRepository(app),
+) : AndroidViewModel(app) {
 
     private val _selectedRange = MutableStateFlow(TimeRange.M1)
     val selectedRange: StateFlow<TimeRange> = _selectedRange.asStateFlow()
@@ -27,6 +28,9 @@ class MacroViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _fetchError = MutableStateFlow<String?>(null)
+    val fetchError: StateFlow<String?> = _fetchError.asStateFlow()
 
     private val _aiInsight = MutableStateFlow("버튼을 눌러 AI 매크로 분석을 시작하세요.")
     val aiInsight: StateFlow<String> = _aiInsight.asStateFlow()
@@ -49,15 +53,18 @@ class MacroViewModel(app: Application) : AndroidViewModel(app) {
     fun fetchMacroData() {
         viewModelScope.launch {
             _isLoading.value = true
+            _fetchError.value = null
             try {
                 _indicators.value = macroRepository.fetchAllIndicators(_selectedRange.value)
             } catch (e: Exception) {
-                e.printStackTrace()
+                _fetchError.value = "데이터 로드 실패: ${e.localizedMessage ?: "네트워크 오류"}"
             } finally {
                 _isLoading.value = false
             }
         }
     }
+
+    fun clearFetchError() { _fetchError.value = null }
 
     fun generateAiInsight() {
         viewModelScope.launch {

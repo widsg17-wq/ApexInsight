@@ -50,6 +50,7 @@ fun MacroDashboardScreen(
     val selectedRange by viewModel.selectedRange.collectAsState()
     val indicators by viewModel.indicators.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val fetchError by viewModel.fetchError.collectAsState()
 
     Scaffold(
         topBar = {
@@ -103,6 +104,29 @@ fun MacroDashboardScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            if (fetchError != null) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = fetchError!!,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { viewModel.clearFetchError() }) {
+                            Text("닫기", color = MaterialTheme.colorScheme.onErrorContainer)
+                        }
+                    }
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

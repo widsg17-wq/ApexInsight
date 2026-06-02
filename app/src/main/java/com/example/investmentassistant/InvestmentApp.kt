@@ -3,6 +3,10 @@ package com.example.investmentassistant
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import coil.Coil
+import coil.ImageLoader
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import com.example.investmentassistant.worker.AutoReportWorker
 import com.example.investmentassistant.worker.CalendarNotificationWorker
 import com.example.investmentassistant.worker.IndicatorAlertWorker
@@ -14,8 +18,28 @@ class InvestmentApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        setupCoil()
         createNotificationChannels()
         MarketMonitorWorker.schedule(this)
+    }
+
+    private fun setupCoil() {
+        Coil.setImageLoader(
+            ImageLoader.Builder(this)
+                .memoryCache {
+                    MemoryCache.Builder(this)
+                        .maxSizePercent(0.20) // 전체 메모리의 20%
+                        .build()
+                }
+                .diskCache {
+                    DiskCache.Builder()
+                        .directory(cacheDir.resolve("image_cache"))
+                        .maxSizeBytes(50L * 1024 * 1024) // 50 MB
+                        .build()
+                }
+                .crossfade(true)
+                .build()
+        )
     }
 
     private fun createNotificationChannels() {

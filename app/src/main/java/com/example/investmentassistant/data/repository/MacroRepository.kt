@@ -9,6 +9,8 @@ import com.example.investmentassistant.api.RealFngApiService
 import com.example.investmentassistant.model.MacroData
 import com.example.investmentassistant.model.MacroIndicators
 import com.example.investmentassistant.model.TimeRange
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 interface MacroRepository {
     suspend fun fetchAllIndicators(range: TimeRange): MacroIndicators
@@ -20,48 +22,48 @@ private class MacroRepositoryImpl(
     private val fngApi: FngApiService = RealFngApiService(),
 ) : MacroRepository {
 
-    override suspend fun fetchAllIndicators(range: TimeRange): MacroIndicators {
+    override suspend fun fetchAllIndicators(range: TimeRange): MacroIndicators = coroutineScope {
         val fLimit = range.fredLimit
         val yInterval = range.yahooInterval
         val yRange = range.yahooRange
 
-        val data10y = fredApi.getMacroData("DGS10", fLimit)
-        val data2y = fredApi.getMacroData("DGS2", fLimit)
-        val fedData = fredApi.getMacroData("WALCL", fLimit)
-        val m2Raw = fredApi.getMacroData("M2SL", fLimit)
-        val realRateRaw = fredApi.getMacroData("DFII10", fLimit)
-        val hySpreadRaw = fredApi.getMacroData("BAMLH0A0HYM2", fLimit)
-        val fng = fngApi.getFearGreedData(fLimit)
+        // 17개 API 호출을 모두 동시에 병렬 실행 (순차 → 병렬: 최대 ~17x 속도 개선)
+        val d10y    = async { fredApi.getMacroData("DGS10", fLimit) }
+        val d2y     = async { fredApi.getMacroData("DGS2", fLimit) }
+        val dFed    = async { fredApi.getMacroData("WALCL", fLimit) }
+        val dM2     = async { fredApi.getMacroData("M2SL", fLimit) }
+        val dReal   = async { fredApi.getMacroData("DFII10", fLimit) }
+        val dHy     = async { fredApi.getMacroData("BAMLH0A0HYM2", fLimit) }
+        val dFng    = async { fngApi.getFearGreedData(fLimit) }
+        val dSp500  = async { financeApi.getIndexData("^GSPC", yInterval, yRange) }
+        val dNasdaq = async { financeApi.getIndexData("^IXIC", yInterval, yRange) }
+        val dDxy    = async { financeApi.getIndexData("DX-Y.NYB", yInterval, yRange) }
+        val dVix    = async { financeApi.getIndexData("^VIX", yInterval, yRange) }
+        val dBtc    = async { financeApi.getIndexData("BTC-USD", yInterval, yRange) }
+        val dGold   = async { financeApi.getIndexData("GC=F", yInterval, yRange) }
+        val dWti    = async { financeApi.getIndexData("CL=F", yInterval, yRange) }
+        val dCopper = async { financeApi.getIndexData("HG=F", yInterval, yRange) }
+        val dKospi  = async { financeApi.getIndexData("^KS11", yInterval, yRange) }
+        val dKrw    = async { financeApi.getIndexData("KRW=X", yInterval, yRange) }
 
-        val sp500 = financeApi.getIndexData("^GSPC", yInterval, yRange)
-        val nasdaq = financeApi.getIndexData("^IXIC", yInterval, yRange)
-        val dollarIndex = financeApi.getIndexData("DX-Y.NYB", yInterval, yRange)
-        val vix = financeApi.getIndexData("^VIX", yInterval, yRange)
-        val btc = financeApi.getIndexData("BTC-USD", yInterval, yRange)
-        val gold = financeApi.getIndexData("GC=F", yInterval, yRange)
-        val wti = financeApi.getIndexData("CL=F", yInterval, yRange)
-        val copper = financeApi.getIndexData("HG=F", yInterval, yRange)
-        val kospi = financeApi.getIndexData("^KS11", yInterval, yRange)
-        val usdkrw = financeApi.getIndexData("KRW=X", yInterval, yRange)
-
-        return MacroIndicators(
-            us10y = data10y.withPercentSuffix(),
-            us2y = data2y.withPercentSuffix(),
-            fedBalance = fedData.toTrillions(divisor = 1_000_000f),
-            m2 = m2Raw.toTrillions(divisor = 1_000f),
-            realRate = realRateRaw.withPercentSuffix(),
-            hySpread = hySpreadRaw.withPercentSuffix(),
-            sp500 = sp500,
-            nasdaq = nasdaq,
-            dollarIndex = dollarIndex,
-            vix = vix,
-            fearGreed = fng,
-            btc = btc,
-            gold = gold,
-            wti = wti,
-            copper = copper,
-            kospi = kospi,
-            usdkrw = usdkrw,
+        MacroIndicators(
+            us10y      = d10y.await().withPercentSuffix(),
+            us2y       = d2y.await().withPercentSuffix(),
+            fedBalance = dFed.await().toTrillions(divisor = 1_000_000f),
+            m2         = dM2.await().toTrillions(divisor = 1_000f),
+            realRate   = dReal.await().withPercentSuffix(),
+            hySpread   = dHy.await().withPercentSuffix(),
+            fearGreed  = dFng.await(),
+            sp500      = dSp500.await(),
+            nasdaq     = dNasdaq.await(),
+            dollarIndex = dDxy.await(),
+            vix        = dVix.await(),
+            btc        = dBtc.await(),
+            gold       = dGold.await(),
+            wti        = dWti.await(),
+            copper     = dCopper.await(),
+            kospi      = dKospi.await(),
+            usdkrw     = dKrw.await(),
         )
     }
 

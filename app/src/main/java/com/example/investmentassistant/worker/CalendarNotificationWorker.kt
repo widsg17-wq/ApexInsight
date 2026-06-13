@@ -29,14 +29,14 @@ class CalendarNotificationWorker(
 
         val unnotified = repo.getUnnotifiedAnnouncedEvents()
         if (unnotified.isNotEmpty()) {
-            unnotified.forEach { sendNotification(it) }
+            sendGroupedNotification(unnotified)
             repo.markAsNotified(unnotified.map { it.id })
         }
 
         return Result.success()
     }
 
-    private fun sendNotification(event: CalendarEvent) {
+    private fun sendGroupedNotification(events: List<CalendarEvent>) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val channel = NotificationChannel(
@@ -46,14 +46,9 @@ class CalendarNotificationWorker(
         ).apply { description = "주요 경제 지표 및 실적 발표 알림" }
         manager.createNotificationChannel(channel)
 
-        val body = when (event.type) {
-            EventType.ECONOMIC -> buildEconomicBody(event)
-            EventType.EARNINGS -> buildEarningsBody(event)
-        }
-
         val pendingIntent = PendingIntent.getActivity(
             context,
-            NOTIFICATION_ID_BASE + event.id.hashCode(),
+            NOTIFICATION_ID_BASE,
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(MainActivity.EXTRA_DESTINATION, "calendar")
@@ -61,39 +56,52 @@ class CalendarNotificationWorker(
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-        val notificationId = NOTIFICATION_ID_BASE + event.id.hashCode()
+        val title = if (events.size == 1) {
+            "📅 ${events.first().title}"
+        } else {
+            "📅 경제 지표 발표 (${events.size}건)"
+        }
+
+        val body = events.joinToString("\n") { event ->
+            when (event.type) {
+                EventType.ECONOMIC -> buildEconomicLine(event)
+                EventType.EARNINGS -> buildEarningsLine(event)
+            }
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("📅 ${event.title}")
+            .setContentTitle(title)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
 
-        manager.notify(notificationId, notification)
+        manager.notify(NOTIFICATION_ID_BASE, notification)
     }
 
-    private fun buildEconomicBody(event: CalendarEvent): String = buildString {
-        event.actual?.let { append("실제: $it") }
+    private fun buildEconomicLine(event: CalendarEvent): String = buildString {
+        append(event.title)
+        append(" ▶")
+        event.actual?.let { append(" 실제: $it") }
         event.forecast?.let { append("  예상: $it") }
         event.previous?.let { append("  이전: $it") }
-        if (isEmpty()) append("결과가 발표됐습니다.")
+        if (endsWith("▶")) append(" 결과 발표됨")
     }
 
-    private fun buildEarningsBody(event: CalendarEvent): String = buildString {
-        val ticker = event.ticker ?: ""
-        appendLine(ticker)
+    private fun buildEarningsLine(event: CalendarEvent): String = buildString {
+        val ticker = event.ticker?.let { "[$it] " } ?: ""
+        append("$ticker${event.title} ▶")
         if (event.epsActual != null) {
-            append("EPS 실제: ${"%.2f".format(event.epsActual)}")
+            append(" EPS 실제: ${"%.2f".format(event.epsActual)}")
             event.epsEstimate?.let { append("  예상: ${"%.2f".format(it)}") }
-            appendLine()
         }
         if (event.revenueActual != null) {
-            append("매출 실제: ${formatRevenue(event.revenueActual)}")
+            append("  매출: ${formatRevenue(event.revenueActual)}")
             event.revenueEstimate?.let { append("  예상: ${formatRevenue(it)}") }
         }
-        if (isEmpty()) append("실적이 발표됐습니다.")
+        if (endsWith("▶")) append(" 실적 발표됨")
     }
 
     private fun formatRevenue(value: Long): String = when {
